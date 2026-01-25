@@ -1,5 +1,3 @@
-version: '3.8'
-
 # 开发环境配置 - 使用本地代码挂载，支持热重载
 # 使用方法:
 # 1. 在项目根目录运行: docker-compose -f docker/docker-compose.dev.yml up --build

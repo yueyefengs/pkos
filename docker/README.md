@@ -73,7 +73,7 @@ docker build -f docker/Dockerfile -t yourusername/pkos:custom .
 
 | 变量名 | 说明 | 默认值 | 必需 |
 |--------|------|--------|------|
-| `IMAGE_NAME` | Docker 镜像名称 | `ghcr.io/yourusername/pkos:latest` | 生产环境必需 |
+| `IMAGE_NAME` | Docker 镜像名称 | `yourusername/pkos:latest` | 生产环境必需 |
 | `FEISHU_APP_ID` | 飞书应用 ID | - | 是 |
 | `FEISHU_APP_SECRET` | 飞书应用密钥 | - | 是 |
 | `FEISHU_ENCRYPT_KEY` | 飞书加密密钥 | - | 可选 |
