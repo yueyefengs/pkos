@@ -99,17 +99,33 @@ jobs:
           VERSION="${{ github.ref_name }}"
           VERSION=${VERSION#refs/tags/v}
 
+          # 拉取各架构镜像
+          docker pull ${{ secrets.DOCKER_USERNAME }}/pkos:${VERSION}-linux-amd64
+          docker pull ${{ secrets.DOCKER_USERNAME }}/pkos:${VERSION}-linux-arm64
+
+          # 重新打标签
+          docker tag ${{ secrets.DOCKER_USERNAME }}/pkos:${VERSION}-linux-amd64 ${{ secrets.DOCKER_USERNAME }}/pkos:${VERSION}-amd64
+          docker tag ${{ secrets.DOCKER_USERNAME }}/pkos:${VERSION}-linux-arm64 ${{ secrets.DOCKER_USERNAME }}/pkos:${VERSION}-arm64
+          docker tag ${{ secrets.DOCKER_USERNAME }}/pkos:latest-linux-amd64 ${{ secrets.DOCKER_USERNAME }}/pkos:amd64
+          docker tag ${{ secrets.DOCKER_USERNAME }}/pkos:latest-linux-arm64 ${{ secrets.DOCKER_USERNAME }}/pkos:arm64
+
+          # 推送新的标签
+          docker push ${{ secrets.DOCKER_USERNAME }}/pkos:${VERSION}-amd64
+          docker push ${{ secrets.DOCKER_USERNAME }}/pkos:${VERSION}-arm64
+          docker push ${{ secrets.DOCKER_USERNAME }}/pkos:amd64
+          docker push ${{ secrets.DOCKER_USERNAME }}/pkos:arm64
+
           # 创建 manifest for versioned tag
           docker buildx imagetools create \
             --tag ${{ secrets.DOCKER_USERNAME }}/pkos:${VERSION} \
-            ${{ secrets.DOCKER_USERNAME }}/pkos:${VERSION}-linux-amd64 \
-            ${{ secrets.DOCKER_USERNAME }}/pkos:${VERSION}-linux-arm64
+            ${{ secrets.DOCKER_USERNAME }}/pkos:${VERSION}-amd64 \
+            ${{ secrets.DOCKER_USERNAME }}/pkos:${VERSION}-arm64
 
           # 创建 manifest for latest tag
           docker buildx imagetools create \
             --tag ${{ secrets.DOCKER_USERNAME }}/pkos:latest \
-            ${{ secrets.DOCKER_USERNAME }}/pkos:latest-linux-amd64 \
-            ${{ secrets.DOCKER_USERNAME }}/pkos:latest-linux-arm64
+            ${{ secrets.DOCKER_USERNAME }}/pkos:amd64 \
+            ${{ secrets.DOCKER_USERNAME }}/pkos:arm64
 
   create-release:
     runs-on: ubuntu-latest
