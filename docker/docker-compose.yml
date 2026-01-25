@@ -8,8 +8,8 @@ version: '3.8'
 
 services:
   bot:
-    image: ${IMAGE_NAME:-ghcr.io/yourusername/pkos:latest}
-    container_name: feishu-knowledge-bot
+    image: ${IMAGE_NAME:-ghcr.io/yueyefeng11/pkos:latest}
+    container_name: pkos
     ports:
       - "8080:8080"
     env_file:
@@ -33,7 +33,7 @@ services:
 
   db:
     image: postgres:15-alpine
-    container_name: feishu-knowledge-db
+    container_name: pkos-db
     environment:
       - POSTGRES_USER=feishu
       - POSTGRES_PASSWORD=feishu123
@@ -44,7 +44,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: feishu-knowledge-redis
+    container_name: pkos-redis
     volumes:
       - redis_data:/data
     restart: unless-stopped
