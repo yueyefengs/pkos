@@ -1,5 +1,11 @@
 version: '3.8'
 
+# 开发环境配置 - 使用本地代码挂载，支持热重载
+# 使用方法:
+# 1. 在项目根目录运行: docker-compose -f docker/docker-compose.dev.yml up --build
+# 2. 修改本地代码会自动重新加载 (FastAPI --reload)
+# 3. 数据和日志持久化到本地目录
+
 services:
   bot:
     build:
@@ -16,11 +22,14 @@ services:
       - DB_PORT=5432
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+    env_file:
+      - ../.env
     ports:
       - "8080:8080"
     depends_on:
       - db
       - redis
+    restart: unless-stopped
 
   db:
     image: postgres:15-alpine
