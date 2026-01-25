@@ -51,6 +51,13 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
 
+      - name: Set version env
+        run: |
+          VERSION="${GITHUB_REF_NAME#refs/tags/}"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+
       - name: Build and push (amd64)
         if: matrix.platform == 'linux/amd64'
         uses: docker/build-push-action@v6
@@ -60,9 +67,11 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/pkos:${{ steps.meta.outputs.version }}-linux-amd64
+            ${{ secrets.DOCKER_USERNAME }}/pkos:${{ env.VERSION }}-linux-amd64
             ${{ secrets.DOCKER_USERNAME }}/pkos:latest-linux-amd64
-            ${{ steps.meta.outputs.tags }}
+            ${{ secrets.DOCKER_USERNAME }}/pkos:${{ env.VERSION }}
+            ${{ secrets.DOCKER_USERNAME }}/pkos:latest
+            ${{ secrets.DOCKER_USERNAME }}/pkos:${{ env.VERSION }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=amd64
           cache-to: type=gha,scope=amd64,mode=max
@@ -76,9 +85,11 @@ jobs:
           platforms: linux/arm64
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/pkos:${{ steps.meta.outputs.version }}-linux-arm64
+            ${{ secrets.DOCKER_USERNAME }}/pkos:${{ env.VERSION }}-linux-arm64
             ${{ secrets.DOCKER_USERNAME }}/pkos:latest-linux-arm64
-            ${{ steps.meta.outputs.tags }}
+            ${{ secrets.DOCKER_USERNAME }}/pkos:${{ env.VERSION }}
+            ${{ secrets.DOCKER_USERNAME }}/pkos:latest
+            ${{ secrets.DOCKER_USERNAME }}/pkos:${{ env.VERSION }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=arm64
           cache-to: type=gha,scope=arm64,mode=max
@@ -101,12 +112,27 @@ jobs:
       - name: Create and push manifest
         run: |
           # 获取版本号
-          VERSION="${{ github.ref_name }}"
-          VERSION=${VERSION#refs/tags/v}
+          VERSION="${GITHUB_REF_NAME#refs/tags/}"
+          echo "Creating manifest for version: $VERSION"
 
           # 拉取各架构镜像
-          docker pull ${{ secrets.DOCKER_USERNAME }}/pkos:${VERSION}-linux-amd64
-          docker pull ${{ secrets.DOCKER_USERNAME }}/pkos:${VERSION}-linux-arm64
+          docker pull ${{ secrets.DOCKER_USERNAME }}/pkos:${VERSION}-linux-amd64 || true
+          docker pull ${{ secrets.DOCKER_USERNAME }}/pkos:${VERSION}-linux-arm64 || true
+
+          # 检查镜像是否存在
+          if docker image inspect ${{ secrets.DOCKER_USERNAME }}/pkos:${VERSION}-linux-amd64 > /dev/null 2>&1; then
+            echo "Found AMD64 image"
+          else
+            echo "ERROR: AMD64 image not found!"
+            exit 1
+          fi
+
+          if docker image inspect ${{ secrets.DOCKER_USERNAME }}/pkos:${VERSION}-linux-arm64 > /dev/null 2>&1; then
+            echo "Found ARM64 image"
+          else
+            echo "ERROR: ARM64 image not found!"
+            exit 1
+          fi
 
           # 重新打标签
           docker tag ${{ secrets.DOCKER_USERNAME }}/pkos:${VERSION}-linux-amd64 ${{ secrets.DOCKER_USERNAME }}/pkos:${VERSION}-amd64
@@ -131,6 +157,8 @@ jobs:
             --tag ${{ secrets.DOCKER_USERNAME }}/pkos:latest \
             ${{ secrets.DOCKER_USERNAME }}/pkos:amd64 \
             ${{ secrets.DOCKER_USERNAME }}/pkos:arm64
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
 
   create-release:
     runs-on: ubuntu-latest
