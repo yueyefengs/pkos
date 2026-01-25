@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 import uvicorn
 from config.settings import settings
 from bot.feishu_client import feishu_client
@@ -32,7 +32,8 @@ async def handle_feishu_event(request: Request):
     # 验证URL签名
     if "url_verify" in data:
         challenge = data.get("challenge", "")
-        return JSONResponse(content={"challenge": challenge})
+        # 飞书 URL 验证需要直接返回 challenge 字符串
+        return PlainTextResponse(content=challenge)
 
     # 验证事件签名
     headers = request.headers
