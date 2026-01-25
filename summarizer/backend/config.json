@@ -1,0 +1,13 @@
+{
+  "configs": [
+    {
+      "provider": "glm",
+      "api_key": "1c73b9677ae4413fbf4a09947df34acc.T7jqtebBVUor4QZA",
+      "base_url": "https://open.bigmodel.cn/api/paas/v4",
+      "model": "glm-4-flash",
+      "temperature": 0.7,
+      "max_tokens": 4000
+    }
+  ],
+  "defaultPrompt": "请对以下内容进行总结，提取关键信息和要点：\n\n{text}"
+}

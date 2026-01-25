@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3:*)",
+      "Bash(yt-dlp:*)",
+      "Bash(ls:*)",
+      "mcp__web-reader__webReader",
+      "Bash(file:*)",
+      "Bash(cat:*)",
+      "WebSearch",
+      "Bash(find:*)",
+      "Bash(ffprobe:*)",
+      "Bash(pip3 install:*)",
+      "Bash(curl:*)"
+    ]
+  }
+}
