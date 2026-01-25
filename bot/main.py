@@ -10,7 +10,13 @@ app = FastAPI(title="Feishu Knowledge Bot", version="1.0.0")
 @app.on_event("startup")
 async def startup():
     """服务启动时的初始化"""
-    await feishu_client.get_tenant_access_token()
+    try:
+        token = await feishu_client.get_tenant_access_token()
+        print(f"Successfully connected to Feishu API. App ID: {feishu_client.app_id}")
+    except Exception as e:
+        print(f"Failed to initialize Feishu client: {e}")
+        print("Please check your Feishu credentials (FEISHU_APP_ID, FEISHU_APP_SECRET)")
+        raise
 
 @app.get("/health")
 async def health():

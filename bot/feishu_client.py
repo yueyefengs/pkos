@@ -21,6 +21,10 @@ class FeishuClient:
         if self.tenant_access_token:
             return self.tenant_access_token
 
+        # 打印调试信息（注意：生产环境应移除敏感信息）
+        print(f"Getting tenant access token with App ID: {self.app_id}")
+        print(f"App Secret length: {len(self.app_secret) if self.app_secret else 0}")
+
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{self.base_url}/auth/v3/tenant_access_token/internal",
@@ -31,7 +35,25 @@ class FeishuClient:
             )
             response.raise_for_status()
             data = response.json()
+
+            print(f"Feishu API response: {data}")
+
+            # 检查API返回的错误码
+            if "code" in data and data["code"] != 0:
+                raise ValueError(
+                    f"Feishu API error: {data.get('msg', 'Unknown error')} "
+                    f"(code: {data['code']})"
+                )
+
+            # 检查token是否存在
+            if "tenant_access_token" not in data:
+                raise ValueError(
+                    f"Feishu API response missing tenant_access_token. "
+                    f"Response: {data}"
+                )
+
             self.tenant_access_token = data["tenant_access_token"]
+            print(f"Successfully got tenant access token")
             return self.tenant_access_token
 
     def verify_event(self, timestamp: str, nonce: str, body: str, signature: str) -> bool:

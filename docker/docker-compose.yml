@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   bot:
+    image: pkos
     build:
       context: ..
       dockerfile: docker/Dockerfile

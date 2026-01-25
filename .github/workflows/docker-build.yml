@@ -32,7 +32,7 @@ jobs:
           file: ./docker/Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/feishu-knowledge-bot:${{ steps.extract_version.outputs.VERSION }}
+            ${{ secrets.DOCKER_USERNAME }}/pkos:${{ steps.extract_version.outputs.VERSION }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -43,7 +43,7 @@ jobs:
           file: ./docker/Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/feishu-knowledge-bot:latest
+            ${{ secrets.DOCKER_USERNAME }}/pkos:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
