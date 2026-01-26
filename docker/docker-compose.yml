@@ -4,8 +4,9 @@
 # 2. 或创建 .env 文件包含: IMAGE_NAME=yourusername/pkos:latest
 # 3. 运行: docker-compose -f docker/docker-compose.yml up -d
 
+name: pkos
 services:
-  bot:
+  pkos:
     image: ${IMAGE_NAME:-yueyefeng11/pkos:latest}
     container_name: pkos
     ports:
@@ -24,6 +25,8 @@ services:
       - DB_PORT=5432
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+    volumes:
+      - ./log:/app/log
 
   db:
     image: postgres:15-alpine
