@@ -1,6 +1,6 @@
 fastapi
 uvicorn[standard]
-httpx
+lark-oapi
 asyncpg
 redis
 faster-whisper

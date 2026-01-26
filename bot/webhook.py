@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from fastapi import BackgroundTasks
+import json
 from typing import Dict, Any
 from bot.feishu_client import feishu_client
 from storage.postgres import storage
@@ -10,39 +10,47 @@ from processors.content_processor import content_processor
 from models.task import TaskCreate
 
 class WebhookHandler:
-    async def handle_message(self, event: Dict[str, Any]) -> Dict[str, Any]:
-        """处理飞书消息事件"""
-        chat_type = event.get("chat_type", "")
-        content = event.get("content", {})
-        message_id = event.get("message_id", "")
-        sender_id = event.get("sender", {}).get("sender_id", {}).get("open_id", "")
+    def handle_message_receive(self, data) -> None:
+        """处理飞书消息事件 - SDK自动解析"""
+        from config.settings import settings
+        event = data.event
+        message = event.message
+        sender = event.sender
 
-        if chat_type == "group":
-            at_text = content.get("at_users", "")
-            if not at_text:  # 没有@机器人，忽略
-                return {"code": 0}
+        # 群聊@检测
+        if message.chat_type == "group":
+            mentions = message.mentions
+            if not mentions or not any(m.id.user_id == settings.feishu_app_id for m in mentions):
+                return
+
+        # 提取消息内容
+        content_dict = json.loads(message.content)
+        text = content_dict.get("text", "")
+        sender_id = sender.sender_id.open_id
 
         # 提取视频URL
-        text = content.get("text", "")
         video_url = self._extract_video_url(text)
-
         if not video_url:
-            await feishu_client.send_message(
+            feishu_client.send_message(
                 sender_id,
                 content="请发送有效的抖音或B站视频链接"
             )
-            return {"code": 0}
+            return
 
         # 验证平台
         platform = video_downloader.detect_platform(video_url)
         if not platform:
-            await feishu_client.send_message(
+            feishu_client.send_message(
                 sender_id,
                 content="目前仅支持抖音和B站视频"
             )
-            return {"code": 0}
+            return
 
-        # 创建任务
+        # 创建任务并异步处理视频
+        asyncio.create_task(self._handle_video_task(video_url, platform, sender_id))
+
+    async def _handle_video_task(self, video_url: str, platform: str, sender_id: str):
+        """创建任务并开始处理视频"""
         task_id = str(uuid.uuid4())
         await storage.connect()
         task = await storage.create_task(
@@ -51,15 +59,13 @@ class WebhookHandler:
         await storage.disconnect()
 
         # 回复用户
-        await feishu_client.send_message(
+        feishu_client.send_message(
             sender_id,
             content=f"收到链接，正在处理中...\n平台: {platform}\n任务ID: {task_id[:8]}"
         )
 
         # 异步处理视频
-        asyncio.create_task(self._process_video(task_id, video_url, sender_id))
-
-        return {"code": 0}
+        await self._process_video(task_id, video_url, sender_id)
 
     async def _process_video(self, task_id: str, video_url: str, user_id: str):
         """异步处理视频"""
@@ -67,20 +73,20 @@ class WebhookHandler:
             await storage.connect()
 
             # 1. 下载视频
-            await feishu_client.send_message(user_id, content="正在下载视频...")
+            feishu_client.send_message(user_id, content="正在下载视频...")
             audio_path, title = await video_downloader.download(video_url)
 
             # 2. 转录
-            await feishu_client.send_message(user_id, content="正在转录音频...")
+            feishu_client.send_message(user_id, content="正在转录音频...")
             raw_content = transcriber.transcribe(audio_path)
 
             # 3. 内容处理
-            await feishu_client.send_message(user_id, content="正在优化内容...")
+            feishu_client.send_message(user_id, content="正在优化内容...")
             processed_content = await content_processor.process(raw_content, title)
 
             # 4. 保存到多维表格
-            await feishu_client.send_message(user_id, content="正在保存到知识库...")
-            record_id = await feishu_client.create_record(title, video_url, processed_content)
+            feishu_client.send_message(user_id, content="正在保存到知识库...")
+            record_id = feishu_client.create_record(title, video_url, processed_content)
 
             # 5. 更新任务状态
             await storage.update_task(
@@ -91,14 +97,14 @@ class WebhookHandler:
             )
 
             # 6. 发送完成通知
-            await feishu_client.send_message(
+            feishu_client.send_message(
                 user_id,
                 content=f"处理完成！\n\n标题: {title}\n已保存到多维表格"
             )
 
         except Exception as e:
             await storage.update_task(task_id, status="failed", error_message=str(e))
-            await feishu_client.send_message(
+            feishu_client.send_message(
                 user_id,
                 content=f"处理失败: {str(e)}"
             )
