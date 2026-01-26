@@ -58,6 +58,26 @@ pip install faster-whisper yt-dlp anthropic httpx fastapi uvicorn selenium webdr
 
 ## Architecture
 
+### Feishu Event Reception Modes
+
+PKOS supports two modes for receiving Feishu events:
+
+1. **WebSocket Long Connection Mode** (Default, Recommended)
+   - Uses `lark.ws.Client` to establish a WebSocket connection
+   - No public IP or domain required
+   - No signature verification or decryption needed
+   - Automatic reconnection
+   - Configuration: Set `FEISHU_EVENT_MODE=websocket` in `.env`
+   - See `docs/feishu-websocket-setup.md` for detailed setup
+
+2. **Webhook Mode** (Traditional)
+   - Requires public IP or domain
+   - Handles signature verification and encryption/decryption
+   - Configuration: Set `FEISHU_EVENT_MODE=webhook` in `.env`
+   - Requires `FEISHU_ENCRYPT_KEY` to be set
+
+The system automatically selects the mode based on the `FEISHU_EVENT_MODE` environment variable. Both modes share the same event handler logic, so switching is seamless.
+
 ### Project Structure
 
 ```
@@ -117,6 +137,12 @@ PKOS/
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
+| `FEISHU_APP_ID` | Feishu application ID | - |
+| `FEISHU_APP_SECRET` | Feishu application secret | - |
+| `FEISHU_EVENT_MODE` | Event reception mode: `websocket` or `webhook` | `websocket` |
+| `FEISHU_ENCRYPT_KEY` | Encryption key (webhook mode only) | - |
+| `FEISHU_BITABLE_TOKEN` | Bitable token for storing transcripts | - |
+| `FEISHU_BITABLE_TABLE_ID` | Bitable table ID | - |
 | `OPENAI_API_KEY` | Required for AI features (summarization, optimization, translation) | - |
 | `OPENAI_BASE_URL` | Custom OpenAI-compatible endpoint | `https://api.openai.com/v1` |
 | `HOST` | Server host address | `0.0.0.0` |
@@ -147,3 +173,4 @@ These are used by the LLM to adapt summarization style based on content type.
 - **File naming**: Sanitized titles with 6-character task ID suffix
 - **Translation**: Only triggered when detected language differs from summary language selection
 - **Output location**: AI-Video-Transcriber outputs to `temp/`; CLI tools output to `outputs/` or specified directory
+- **Feishu Event Mode**: Use WebSocket mode (default) for simplified deployment without public IP. See `docs/feishu-websocket-setup.md` for setup guide.

@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     feishu_bot_name: str = "知识助手"
     feishu_encrypt_key: Optional[str] = None
 
+    # 飞书事件接收模式: "webhook" 或 "websocket"
+    feishu_event_mode: Literal["webhook", "websocket"] = "websocket"
+
     # 飞书多维表格配置
     feishu_bitable_token: str
     feishu_bitable_table_id: str
