@@ -5,6 +5,9 @@ import json
 import httpx
 from typing import Optional
 from config.settings import settings
+from config.logger import setup_logger
+
+logger = setup_logger("pkos.feishu_client")
 
 class FeishuClient:
     def __init__(self):
@@ -21,9 +24,7 @@ class FeishuClient:
         if self.tenant_access_token:
             return self.tenant_access_token
 
-        # 打印调试信息（注意：生产环境应移除敏感信息）
-        print(f"Getting tenant access token with App ID: {self.app_id}")
-        print(f"App Secret length: {len(self.app_secret) if self.app_secret else 0}")
+        logger.debug("Requesting tenant access token")
 
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -36,35 +37,37 @@ class FeishuClient:
             response.raise_for_status()
             data = response.json()
 
-            print(f"Feishu API response: {data}")
-
             # 检查API返回的错误码
             if "code" in data and data["code"] != 0:
-                raise ValueError(
-                    f"Feishu API error: {data.get('msg', 'Unknown error')} "
-                    f"(code: {data['code']})"
-                )
+                error_msg = f"Feishu API error: {data.get('msg', 'Unknown error')} (code: {data['code']})"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
 
             # 检查token是否存在
             if "tenant_access_token" not in data:
-                raise ValueError(
-                    f"Feishu API response missing tenant_access_token. "
-                    f"Response: {data}"
-                )
+                error_msg = "Feishu API response missing tenant_access_token"
+                logger.error("%s. Response: %s", error_msg, data)
+                raise ValueError(error_msg)
 
             self.tenant_access_token = data["tenant_access_token"]
-            print(f"Successfully got tenant access token")
+            logger.info("Successfully obtained tenant access token")
             return self.tenant_access_token
 
     def verify_event(self, timestamp: str, nonce: str, body: str, signature: str) -> bool:
         """验证飞书事件签名"""
         if not self.encrypt_key:
+            logger.warning("No encrypt key configured, skipping signature verification")
             return True  # 如果没有配置加密密钥，跳过验证
 
         key = base64.b64decode(self.encrypt_key)
         message = f"{timestamp}{nonce}{body}".encode()
         expected_signature = hmac.new(key, message, hashlib.sha256).hexdigest()
-        return expected_signature == signature
+        is_valid = expected_signature == signature
+
+        if not is_valid:
+            logger.warning("Signature verification failed")
+
+        return is_valid
 
     async def send_message(self, receive_id: str, msg_type: str = "text", content: str = ""):
         """发送消息"""
@@ -84,6 +87,7 @@ class FeishuClient:
                 }
             )
             response.raise_for_status()
+            logger.debug("Message sent successfully to %s", receive_id)
             return response.json()
 
     async def create_record(self, title: str, video_url: str, content: str) -> str:
@@ -93,6 +97,8 @@ class FeishuClient:
             记录ID
         """
         token = await self.get_tenant_access_token()
+
+        logger.debug("Creating record in bitable: %s", title[:50])
 
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -112,7 +118,9 @@ class FeishuClient:
             )
             response.raise_for_status()
             data = response.json()
-            return data["data"]["record"]["record_id"]
+            record_id = data["data"]["record"]["record_id"]
+            logger.info("Record created successfully: %s", record_id)
+            return record_id
 
 # 全局飞书客户端实例
 feishu_client = FeishuClient()

@@ -4,8 +4,10 @@
 # 2. 修改本地代码会自动重新加载 (FastAPI --reload)
 # 3. 数据和日志持久化到本地目录
 
+name: pkos
 services:
-  bot:
+  pkos:
+    container_name: pkos
     build:
       context: ..
       dockerfile: docker/Dockerfile
@@ -14,6 +16,7 @@ services:
       - ..:/app
       - /app/__pycache__
       - /app/.pytest_cache
+      - ../log:/app/log
     environment:
       - PYTHONUNBUFFERED=1
       - DB_HOST=db
@@ -30,6 +33,7 @@ services:
     restart: unless-stopped
 
   db:
+    container_name: pkos-db
     image: postgres:15-alpine
     environment:
       - POSTGRES_USER=feishu
@@ -41,9 +45,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   redis:
+    container_name: pkos-redis
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
 

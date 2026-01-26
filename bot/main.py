@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse, PlainTextResponse
 import uvicorn
 from config.settings import settings
+from config.logger import logger
 from bot.feishu_client import feishu_client
 from bot.webhook import webhook_handler
 
@@ -12,10 +13,10 @@ async def startup():
     """服务启动时的初始化"""
     try:
         token = await feishu_client.get_tenant_access_token()
-        print(f"Successfully connected to Feishu API. App ID: {feishu_client.app_id}")
+        logger.info("Successfully connected to Feishu API")
     except Exception as e:
-        print(f"Failed to initialize Feishu client: {e}")
-        print("Please check your Feishu credentials (FEISHU_APP_ID, FEISHU_APP_SECRET)")
+        logger.error("Failed to initialize Feishu client: %s", e)
+        logger.warning("Please check your Feishu credentials (FEISHU_APP_ID, FEISHU_APP_SECRET)")
         raise
 
 @app.get("/health")
@@ -27,6 +28,8 @@ async def health():
 async def handle_feishu_event(request: Request):
     """处理飞书事件"""
     body = await request.body()
+    if not body:
+        raise HTTPException(status_code=400, detail="Empty request body")
     data = await request.json()
 
     # 验证URL签名
@@ -42,14 +45,18 @@ async def handle_feishu_event(request: Request):
     signature = headers.get("X-Lark-Signature", "")
 
     if not feishu_client.verify_event(timestamp, nonce, body.decode(), signature):
+        logger.warning("Invalid signature for request from %s", request.client)
         raise HTTPException(status_code=403, detail="Invalid signature")
 
     # 处理事件
     event = data.get("event", {})
     event_type = event.get("type", "")
 
+    logger.debug("Received event type: %s", event_type)
+
     if event_type == "message.receive_v1":
         result = await webhook_handler.handle_message(event)
+        logger.info("Message handled successfully")
 
     return JSONResponse(content={"code": 0, "msg": "success"})
 

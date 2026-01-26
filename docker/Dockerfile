@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # 创建必要目录
-RUN mkdir -p temp storage logs
+RUN mkdir -p temp storage log
 
 # 暴露端口
 EXPOSE 8080
