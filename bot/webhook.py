@@ -13,15 +13,46 @@ class WebhookHandler:
     def handle_message_receive(self, data) -> None:
         """处理飞书消息事件 - SDK自动解析"""
         from config.settings import settings
+        from config.logger import logger
+
         event = data.event
         message = event.message
         sender = event.sender
 
+        # Debug logging
+        logger.info("=== Message Event Received ===")
+        logger.info(f"Chat type: {message.chat_type}")
+        logger.info(f"Message ID: {message.message_id}")
+        logger.info(f"Sender: {sender.sender_id.open_id}")
+
         # 群聊@检测
         if message.chat_type == "group":
             mentions = message.mentions
-            if not mentions or not any(m.id.user_id == settings.feishu_app_id for m in mentions):
+            logger.info(f"Mentions count: {len(mentions) if mentions else 0}")
+
+            if mentions:
+                for mention in mentions:
+                    logger.info(f"Mention - user_id: {mention.id.user_id}, open_id: {mention.id.open_id}")
+                    logger.info(f"Mention - name: {mention.name}, tenant_key: {mention.tenant_key}")
+
+            logger.info(f"Checking against app_id: {settings.feishu_app_id}")
+
+            if not mentions:
+                logger.warning("No mentions found in group message, ignoring")
                 return
+
+            # 检查是否@了机器人 - 可能需要检查 open_id 而不是 user_id
+            bot_mentioned = any(
+                m.id.user_id == settings.feishu_app_id or
+                m.id.open_id == settings.feishu_app_id
+                for m in mentions
+            )
+
+            if not bot_mentioned:
+                logger.warning(f"Bot not mentioned in group message")
+                return
+
+            logger.info("✅ Bot was mentioned, processing message")
 
         # 提取消息内容
         content_dict = json.loads(message.content)
