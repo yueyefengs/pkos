@@ -32,3 +32,43 @@ class TaskUpdate(BaseModel):
     error_message: Optional[str] = None
     content: Optional[str] = None
     completed_at: Optional[datetime] = None
+
+# 学习进度相关模型
+class LearningStatus(str, Enum):
+    NOT_STARTED = "not_started"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    REVIEWING = "reviewing"
+
+class ConceptStatus(str, Enum):
+    UNKNOWN = "unknown"
+    FAMILIAR = "familiar"
+    UNDERSTOOD = "understood"
+    MASTERED = "mastered"
+
+class LearningProgress(BaseModel):
+    id: Optional[int] = None
+    user_id: str = Field(..., description="Telegram user ID")
+    task_id: int = Field(..., description="Associated task ID")
+    status: LearningStatus = Field(default=LearningStatus.NOT_STARTED)
+    study_time: int = Field(default=0, description="Total study time in seconds")
+    questions_asked: int = Field(default=0, description="Number of questions asked")
+    last_position: Optional[str] = Field(None, description="Last reading position")
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class ConceptMastery(BaseModel):
+    id: Optional[int] = None
+    progress_id: int = Field(..., description="Associated learning progress ID")
+    concept: str = Field(..., description="Concept name")
+    status: ConceptStatus = Field(default=ConceptStatus.UNKNOWN)
+    notes: Optional[str] = Field(None, description="User notes")
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class LearningCheckpoint(BaseModel):
+    id: Optional[int] = None
+    progress_id: int = Field(..., description="Associated learning progress ID")
+    content: str = Field(..., description="Checkpoint content/summary")
+    position: str = Field(..., description="Position in the article")
+    created_at: Optional[datetime] = None
