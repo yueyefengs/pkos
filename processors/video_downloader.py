@@ -83,10 +83,14 @@ class VideoDownloader:
             'noplaylist': True,
         }
 
-        # 检查cookies文件
-        cookies_file = Path(settings.douyin_cookies_file)
-        if cookies_file.exists():
-            ydl_opts['cookiefile'] = str(cookies_file)
+        # 优先从浏览器读取cookies（更稳定），否则使用cookies文件
+        try:
+            ydl_opts['cookiesfrombrowser'] = ('chrome',)
+        except Exception:
+            # 如果浏览器cookies读取失败，尝试使用cookies文件
+            cookies_file = Path(settings.douyin_cookies_file)
+            if cookies_file.exists():
+                ydl_opts['cookiefile'] = str(cookies_file)
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)

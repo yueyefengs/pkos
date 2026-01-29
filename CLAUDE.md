@@ -169,6 +169,8 @@ PKOS/
 |----------|---------|---------|
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token | - |
 | `TELEGRAM_BOT_USERNAME` | Telegram bot username (optional) | - |
+| `HTTP_PROXY` | HTTP proxy (required in China) | - |
+| `HTTPS_PROXY` | HTTPS proxy (required in China) | - |
 | `DB_HOST` | PostgreSQL host | `db` (Docker) / `localhost` (local) |
 | `DB_PORT` | PostgreSQL port | `5432` |
 | `DB_USER` | Database user | `pkos` |
@@ -189,10 +191,28 @@ PKOS/
 
 ### Cookie Requirements
 
-- **Douyin**: Requires `douyin_cookies.txt` (export via "Get cookies.txt LOCALLY" browser extension)
-- **Bilibili**: yt-dlp handles cookies automatically, but `--cookies-from-browser chrome` option available
+**Douyin视频下载**:
+- **自动模式（推荐）**: yt-dlp会自动从Chrome浏览器读取cookies，只需在Chrome中保持登录状态即可
+- **手动模式（备选）**: 如果自动读取失败，可导出`douyin_cookies.txt`（使用"Get cookies.txt LOCALLY"扩展）
+
+**Bilibili视频**: yt-dlp自动处理，无需配置
 
 See [docs/douyin-cookies-setup.md](docs/douyin-cookies-setup.md) for detailed setup instructions.
+
+### Proxy Configuration (China Mainland)
+
+Telegram API is blocked in China mainland. You must configure a proxy:
+
+```bash
+# In .env file
+HTTP_PROXY=http://127.0.0.1:7897
+HTTPS_PROXY=http://127.0.0.1:7897
+```
+
+Common proxy ports:
+- Clash: 7890 or 7897
+- V2Ray: 1080 or 10808
+- Shadowsocks: 1080
 
 ## Important Notes
 
@@ -207,16 +227,34 @@ See [docs/douyin-cookies-setup.md](docs/douyin-cookies-setup.md) for detailed se
 ## Troubleshooting
 
 ### Telegram Bot Not Responding
+
+**Network Connection Error** (`httpx.ConnectError`):
+1. **In China**: Configure proxy in `.env`:
+   ```bash
+   HTTP_PROXY=http://127.0.0.1:7897
+   HTTPS_PROXY=http://127.0.0.1:7897
+   ```
+2. Verify proxy is running: `curl -x http://127.0.0.1:7897 https://api.telegram.org`
+3. Check if proxy port is correct (Clash usually uses 7890 or 7897)
+
+**Other Issues**:
 1. Check if bot process is running: `ps aux | grep telegram_bot`
 2. Check logs: `tail -f telegram_bot.log`
 3. Verify database and Redis are accessible
 4. Restart bot: `pkill -f start_telegram_bot && python3 start_telegram_bot.py`
 
 ### Douyin Video Download Fails
-1. Check if `douyin_cookies.txt` exists and is not empty
-2. Verify cookies are fresh (not expired)
-3. Re-export cookies from browser after logging in
-4. See [docs/douyin-cookies-setup.md](docs/douyin-cookies-setup.md)
+
+**"Fresh cookies are needed" Error**:
+1. **Automatic (Recommended)**: Ensure you're logged in to douyin.com in Chrome
+   - yt-dlp will automatically read cookies from browser
+   - No manual export needed
+2. **Manual fallback**: If automatic fails, export cookies:
+   - Install "Get cookies.txt LOCALLY" extension
+   - Login to www.douyin.com
+   - Export cookies to `douyin_cookies.txt`
+   - See [docs/douyin-cookies-setup.md](docs/douyin-cookies-setup.md)
+3. Verify cookies: `yt-dlp --cookies-from-browser chrome --get-title "抖音视频链接"`
 
 ### Database Connection Issues
 - For local execution: Use `DB_HOST=localhost`
