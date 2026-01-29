@@ -98,7 +98,8 @@ PKOS/
 │   ├── progress_tracker.py  # Learning progress
 │   └── session_manager.py   # Redis session management
 ├── processors/              # Video and audio processing
-│   ├── video_downloader.py  # yt-dlp wrapper
+│   ├── video_downloader.py  # Main video downloader (platform detection)
+│   ├── douyin_crawler_downloader.py  # Douyin professional scraper (Douyin_TikTok_Download_API)
 │   ├── transcriber.py       # Faster-Whisper wrapper
 │   └── llm_client.py        # Multi-LLM client
 ├── storage/                 # Data persistence
@@ -144,6 +145,19 @@ PKOS/
 - Conversation history management
 - Mode switching (normal/learning)
 
+**processors/video_downloader.py**
+- Platform detection (Douyin/Bilibili)
+- Routes to appropriate downloader
+- Bilibili: yt-dlp with automatic cookie handling
+- Douyin: Delegates to douyin_crawler_downloader
+
+**processors/douyin_crawler_downloader.py**
+- Professional Douyin scraper using Douyin_TikTok_Download_API
+- Bypasses anti-scraping (X-Bogus/A-Bogus algorithms)
+- Pipeline: URL→aweme_id→video_data→download→ffmpeg_extract
+- Cookie management: Converts Netscape format to crawler config
+- Returns m4a audio (mono, 16kHz)
+
 **processors/llm_client.py**
 - Multi-LLM support: OpenAI, Claude, DeepSeek, GLM
 - Configuration-driven model selection
@@ -157,7 +171,9 @@ PKOS/
 
 ### Processing Pipeline
 
-1. **Video Download**: yt-dlp extracts audio directly (m4a format, mono, 16kHz)
+1. **Video Download**:
+   - Bilibili: yt-dlp extracts audio directly (m4a format, mono, 16kHz)
+   - Douyin: Professional crawler fetches video → ffmpeg extracts audio (m4a, mono, 16kHz)
 2. **Transcription**: faster-whisper with VAD, temperature sampling, language detection
 3. **Optimization**: LLM corrects typos, completes sentences, intelligent paragraphing
 4. **Translation**: Conditional translation via LLM when detected language != target language
@@ -191,9 +207,12 @@ PKOS/
 
 ### Cookie Requirements
 
-**Douyin视频下载**:
-- **自动模式（推荐）**: yt-dlp会自动从Chrome浏览器读取cookies，只需在Chrome中保持登录状态即可
-- **手动模式（备选）**: 如果自动读取失败，可导出`douyin_cookies.txt`（使用"Get cookies.txt LOCALLY"扩展）
+**Douyin视频下载** (专业爬虫方案):
+- 使用Douyin_TikTok_Download_API专业爬虫，绕过抖音反爬虫机制(X-Bogus/A-Bogus算法)
+- **必须配置**: 在Chrome浏览器登录抖音后，使用"Get cookies.txt LOCALLY"扩展导出`douyin_cookies.txt`
+- Cookie文件位置: `/Users/yueqingli/code/pkos/douyin_cookies.txt` (Netscape格式)
+- 系统自动转换cookies到爬虫配置格式并更新
+- ⚠️ 由于抖音风控严格，cookies可能需要定期更新
 
 **Bilibili视频**: yt-dlp自动处理，无需配置
 
