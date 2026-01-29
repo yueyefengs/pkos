@@ -65,43 +65,12 @@ class VideoDownloader:
         raise Exception("未找到下载的音频文件")
 
     async def _download_douyin(self, url: str) -> Tuple[str, str]:
-        """下载抖音视频"""
-        import yt_dlp
+        """下载抖音视频 - 使用专业爬虫"""
+        from processors.douyin_crawler_downloader import get_douyin_crawler_downloader
 
-        # 抖音通常可以用yt-dlp，如果需要cookies
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'outtmpl': str(self.temp_dir / "douyin_%(id)s.%(ext)s"),
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'm4a',
-                'preferredquality': '192'
-            }],
-            'postprocessor_args': ['-ac', '1', '-ar', '16000'],
-            'quiet': True,
-            'no_warnings': True,
-            'noplaylist': True,
-        }
-
-        # 优先从浏览器读取cookies（更稳定），否则使用cookies文件
-        try:
-            ydl_opts['cookiesfrombrowser'] = ('chrome',)
-        except Exception:
-            # 如果浏览器cookies读取失败，尝试使用cookies文件
-            cookies_file = Path(settings.douyin_cookies_file)
-            if cookies_file.exists():
-                ydl_opts['cookiefile'] = str(cookies_file)
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            title = info.get('title', info.get('description', 'unknown')[:50])
-
-        # 查找生成的音频文件
-        for ext in ['m4a', 'webm', 'mp3', 'wav']:
-            for file in self.temp_dir.glob(f"douyin_*.{ext}"):
-                return str(file), self._sanitize_title(title)
-
-        raise Exception("未找到下载的音频文件")
+        # 使用Douyin_TikTok_Download_API的专业爬虫
+        downloader = get_douyin_crawler_downloader(cookies_file=settings.douyin_cookies_file)
+        return await downloader.download(url)
 
     def _sanitize_title(self, title: str) -> str:
         """清理标题为安全的文件名"""
