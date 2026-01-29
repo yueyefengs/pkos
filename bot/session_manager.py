@@ -3,7 +3,7 @@ Redis会话管理器
 管理用户工作区(激活的文章)、对话历史、学习模式等
 """
 import json
-import aioredis
+import redis.asyncio as redis
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 from config.settings import settings
@@ -12,11 +12,11 @@ from config.logger import logger
 
 class SessionManager:
     def __init__(self):
-        self.redis: Optional[aioredis.Redis] = None
+        self.redis: Optional[redis.Redis] = None
 
     async def connect(self):
         """连接到Redis"""
-        self.redis = await aioredis.from_url(
+        self.redis = redis.from_url(
             f"redis://{settings.redis_host}:{settings.redis_port}/{settings.redis_db}",
             encoding="utf-8",
             decode_responses=True

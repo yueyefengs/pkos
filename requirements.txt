@@ -12,4 +12,4 @@ anthropic
 pydantic-settings
 python-dotenv
 python-telegram-bot[all]==20.8
-aioredis
+redis[hiredis]>=5.0.0
