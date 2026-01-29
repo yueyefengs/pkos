@@ -101,10 +101,18 @@ class PostgresStorage:
         return self._record_to_task(record)
 
     async def get_task(self, task_id: str) -> Optional[Task]:
-        """根据task_id获取任务"""
+        """根据task_id(UUID)获取任务"""
         async with self.pool.acquire() as conn:
             record = await conn.fetchrow(
                 "SELECT * FROM tasks WHERE task_id = $1", task_id
+            )
+        return self._record_to_task(record) if record else None
+
+    async def get_task_by_id(self, id: int) -> Optional[Task]:
+        """根据id(数据库自增ID)获取任务"""
+        async with self.pool.acquire() as conn:
+            record = await conn.fetchrow(
+                "SELECT * FROM tasks WHERE id = $1", id
             )
         return self._record_to_task(record) if record else None
 

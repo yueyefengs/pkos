@@ -63,6 +63,10 @@ class Settings(BaseSettings):
     claude_api_key: Optional[str] = None
     claude_model: str = "claude-3-5-sonnet-20241022"
 
+    # Telegram Bot 配置
+    telegram_bot_token: str
+    telegram_bot_username: Optional[str] = None
+
     @property
     def database_url(self) -> str:
         return f"postgresql+asyncpg://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}"

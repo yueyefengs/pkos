@@ -140,9 +140,7 @@ async def chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         # 验证任务是否存在
         await storage.connect()
-        # 通过id查询任务(这里需要新方法)
-        tasks = await storage.get_recent_tasks(limit=100)
-        task = next((t for t in tasks if t.id == task_id), None)
+        task = await storage.get_task_by_id(task_id)
         await storage.disconnect()
 
         if not task:
@@ -201,8 +199,7 @@ async def learn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         # 验证任务是否存在
         await storage.connect()
-        tasks = await storage.get_recent_tasks(limit=100)
-        task = next((t for t in tasks if t.id == task_id), None)
+        task = await storage.get_task_by_id(task_id)
 
         if not task:
             await storage.disconnect()
@@ -340,8 +337,7 @@ async def add_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         # 验证任务是否存在
         await storage.connect()
-        tasks = await storage.get_recent_tasks(limit=100)
-        task = next((t for t in tasks if t.id == task_id), None)
+        task = await storage.get_task_by_id(task_id)
         await storage.disconnect()
 
         if not task:
