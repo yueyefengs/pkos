@@ -11,5 +11,5 @@ openai
 anthropic
 pydantic-settings
 python-dotenv
-python-telegram-bot[all]==20.8
+python-telegram-bot>=22.6  # Python 3.13兼容版本
 redis[hiredis]>=5.0.0
