@@ -85,5 +85,38 @@ class LLMClient:
             )
             return response.choices[0].message.content or "其他"
 
+    async def generate_chat_response(self, prompt: str) -> str:
+        """
+        生成对话回复
+        用于Telegram bot的对话功能
+
+        Args:
+            prompt: 完整的对话提示词(包含上下文和用户问题)
+
+        Returns:
+            str: AI生成的回复
+        """
+        model_name = self.default_model
+        model_config = self.config["models"].get(model_name, {})
+
+        if model_config.get("type") == "claude":
+            response = await self.clients[model_name].messages.create(
+                model=model_config.get("model", "claude-3-5-sonnet-20241022"),
+                max_tokens=4096,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            return response.content[0].text
+        else:
+            response = await self.clients[model_name].chat.completions.create(
+                model=model_config.get("model", "gpt-4o"),
+                messages=[
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=4096
+            )
+            return response.choices[0].message.content or "抱歉,我无法生成回复"
+
 # 全局LLM客户端实例
 llm_client = LLMClient()
