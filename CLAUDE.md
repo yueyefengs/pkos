@@ -17,6 +17,19 @@ This is a "Learning Content Analysis and Review Assistant" project. When working
 
 ## Common Commands
 
+### Telegram Bot
+
+```bash
+# Start Telegram bot
+python3 start_telegram_bot.py
+
+# Run in background
+nohup python3 start_telegram_bot.py > telegram_bot.log 2>&1 &
+
+# View logs
+tail -f telegram_bot.log
+```
+
 ### Video Downloaders
 
 ```bash
@@ -52,125 +65,160 @@ python3 start.py --reload     # Development mode
 brew install ffmpeg           # macOS
 sudo apt install ffmpeg       # Ubuntu/Debian
 
-# Python dependencies (install in each subdirectory as needed)
-pip install faster-whisper yt-dlp anthropic httpx fastapi uvicorn selenium webdriver-manager
+# Python dependencies
+pip install -r requirements.txt
+```
+
+### Docker Deployment
+
+```bash
+# Development mode (with code hot-reload)
+docker-compose -f docker/docker-compose.dev.yml up
+
+# Production mode
+docker-compose -f docker/docker-compose.yml up -d
+
+# Stop services
+docker-compose -f docker/docker-compose.yml down
 ```
 
 ## Architecture
-
-### Feishu Event Reception Modes
-
-PKOS supports two modes for receiving Feishu events:
-
-1. **WebSocket Long Connection Mode** (Default, Recommended)
-   - Uses `lark.ws.Client` to establish a WebSocket connection
-   - No public IP or domain required
-   - No signature verification or decryption needed
-   - Automatic reconnection
-   - Configuration: Set `FEISHU_EVENT_MODE=websocket` in `.env`
-   - See `docs/feishu-websocket-setup.md` for detailed setup
-
-2. **Webhook Mode** (Traditional)
-   - Requires public IP or domain
-   - Handles signature verification and encryption/decryption
-   - Configuration: Set `FEISHU_EVENT_MODE=webhook` in `.env`
-   - Requires `FEISHU_ENCRYPT_KEY` to be set
-
-The system automatically selects the mode based on the `FEISHU_EVENT_MODE` environment variable. Both modes share the same event handler logic, so switching is seamless.
 
 ### Project Structure
 
 ```
 PKOS/
-├── AI-Video-Transcriber/    # Main web-based video transcriber (FastAPI)
-│   ├── backend/              # Core processing modules
-│   │   ├── main.py          # FastAPI app with SSE for real-time progress
-│   │   ├── video_processor.py  # yt-dlp integration
-│   │   ├── transcriber.py   # Faster-Whisper speech-to-text
-│   │   ├── summarizer.py    # OpenAI GPT-4o for text optimization
-│   │   └── translator.py    # GPT-4o translation
-│   ├── static/              # Frontend (HTML/JS)
-│   ├── temp/                # Temporary audio/video files
-│   └── start.py             # Startup script
+├── bot/                     # Telegram bot modules
+│   ├── telegram_client.py   # Telegram API wrapper
+│   ├── telegram_main.py     # Bot entry point
+│   ├── command_handlers.py  # Command handlers
+│   ├── message_handler.py   # Message routing
+│   ├── conversation_engine.py  # LLM conversation
+│   ├── content_analysis.py  # Content analysis features
+│   ├── progress_tracker.py  # Learning progress
+│   └── session_manager.py   # Redis session management
+├── processors/              # Video and audio processing
+│   ├── video_downloader.py  # yt-dlp wrapper
+│   ├── transcriber.py       # Faster-Whisper wrapper
+│   └── llm_client.py        # Multi-LLM client
+├── storage/                 # Data persistence
+│   └── postgres.py          # PostgreSQL operations
+├── models/                  # Data models
+│   └── task.py             # Task and learning models
+├── config/                  # Configuration
+│   └── settings.py         # Environment settings
+├── docker/                  # Docker configuration
+│   ├── Dockerfile
+│   ├── docker-compose.yml
+│   └── docker-compose.dev.yml
+├── docs/                    # Documentation
+│   ├── telegram-bot-setup.md
+│   └── douyin-cookies-setup.md
+├── AI-Video-Transcriber/    # Web-based video transcriber (FastAPI)
 ├── summarizer/              # Standalone document summarization service
-│   ├── backend/
-│   │   ├── main.py          # FastAPI with multi-LLM support
-│   │   └── config.json      # LLM configurations
-│   ├── frontend/            # Web UI
-│   └── start.py             # Startup script
-├── bili2text/               # Legacy Bilibili-specific transcriber (Tkinter GUI)
-├── video_transcriber.py     # Generic CLI video transcriber
-├── bilibili_downloader.py    # Bilibili CLI downloader
-├── douyin_downloader.py     # Douyin CLI downloader (Selenium-based)
-├── prompt/                  # Prompt templates for different content types
-└── outputs/                 # Default output directory
+├── start_telegram_bot.py    # Telegram bot launcher
+└── requirements.txt         # Python dependencies
 ```
 
 ### Key Components
 
-**AI-Video-Transcriber/backend/main.py**
-- FastAPI application with SSE (Server-Sent Events) for real-time progress
-- Task queue system with persistent state via `temp/tasks.json`
-- Processes: download → transcribe → optimize → summarize → (optionally translate)
-- Output files: `transcript_{title}_{id}.md`, `summary_{title}_{id}.md`, `translation_{title}_{id}.md`
+**bot/telegram_main.py**
+- Main entry point for Telegram bot
+- Registers all command handlers
+- Manages bot lifecycle (initialization, polling, shutdown)
 
-**summarizer/backend/main.py**
-- Multi-LLM support: OpenAI, Claude, DeepSeek, GLM, custom OpenAI-compatible APIs
-- Configuration-driven via `config.json`
-- API endpoints: `/api/summarize`, `/api/test`, `/api/files`
+**bot/command_handlers.py**
+- 17 command handlers: /start, /help, /chat, /learn, /history, etc.
+- Workspace management: /add, /context, /clear
+- Content analysis: /outline, /summary, /qa, /extend
+- Progress tracking: /progress, /workspace, /stats, /checkpoint
 
-**video_transcriber.py**
-- Standalone CLI tool
-- Uses faster-whisper with configurable model size (tiny/base/small/medium/large)
-- VAD (Voice Activity Detection) filtering enabled
-- Outputs both .md and .txt files
+**bot/conversation_engine.py**
+- Dual-mode conversation: Normal (direct Q&A) vs Learning (Socratic teaching)
+- LLM integration with conversation history
+- Context-aware responses based on workspace articles
+
+**bot/session_manager.py**
+- Redis-based session management
+- Workspace operations (add/remove/clear articles)
+- Conversation history management
+- Mode switching (normal/learning)
+
+**processors/llm_client.py**
+- Multi-LLM support: OpenAI, Claude, DeepSeek, GLM
+- Configuration-driven model selection
+- Both completion and chat APIs
+
+**storage/postgres.py**
+- Task CRUD operations
+- Learning progress tracking
+- Concept mastery management
+- Checkpoint system
 
 ### Processing Pipeline
 
 1. **Video Download**: yt-dlp extracts audio directly (m4a format, mono, 16kHz)
 2. **Transcription**: faster-whisper with VAD, temperature sampling, language detection
-3. **Optimization**: OpenAI GPT-4o corrects typos, completes sentences, intelligent paragraphing
-4. **Translation**: Conditional translation via GPT-4o when detected language != target language
+3. **Optimization**: LLM corrects typos, completes sentences, intelligent paragraphing
+4. **Translation**: Conditional translation via LLM when detected language != target language
 5. **Summarization**: AI-generated summary in selected language
 
 ### Environment Variables
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
-| `FEISHU_APP_ID` | Feishu application ID | - |
-| `FEISHU_APP_SECRET` | Feishu application secret | - |
-| `FEISHU_EVENT_MODE` | Event reception mode: `websocket` or `webhook` | `websocket` |
-| `FEISHU_ENCRYPT_KEY` | Encryption key (webhook mode only) | - |
-| `FEISHU_BITABLE_TOKEN` | Bitable token for storing transcripts | - |
-| `FEISHU_BITABLE_TABLE_ID` | Bitable table ID | - |
-| `OPENAI_API_KEY` | Required for AI features (summarization, optimization, translation) | - |
-| `OPENAI_BASE_URL` | Custom OpenAI-compatible endpoint | `https://api.openai.com/v1` |
-| `HOST` | Server host address | `0.0.0.0` |
-| `PORT` | Server port | `8000` (AI-Video-Transcriber), `8001` (summarizer) |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token | - |
+| `TELEGRAM_BOT_USERNAME` | Telegram bot username (optional) | - |
+| `DB_HOST` | PostgreSQL host | `db` (Docker) / `localhost` (local) |
+| `DB_PORT` | PostgreSQL port | `5432` |
+| `DB_USER` | Database user | `pkos` |
+| `DB_PASSWORD` | Database password | `pkos123` |
+| `DB_NAME` | Database name | `pkos_knowledge` |
+| `REDIS_HOST` | Redis host | `redis` (Docker) / `localhost` (local) |
+| `REDIS_PORT` | Redis port | `6379` |
+| `REDIS_DB` | Redis database number | `0` |
+| `LLM_DEFAULT_PROVIDER` | Default LLM provider | `openai` |
+| `OPENAI_API_KEY` | OpenAI API key | - |
+| `OPENAI_BASE_URL` | OpenAI API base URL | `https://api.openai.com/v1` |
+| `OPENAI_MODEL` | OpenAI model name | `gpt-4o` |
+| `CLAUDE_API_KEY` | Claude API key | - |
+| `CLAUDE_MODEL` | Claude model name | `claude-3-5-sonnet-20241022` |
+| `DEEPSEEK_API_KEY` | DeepSeek API key | - |
+| `GLM_API_KEY` | GLM (智谱) API key | - |
 | `WHISPER_MODEL_SIZE` | Whisper model size | `base` |
 
 ### Cookie Requirements
 
-- **Douyin**: Requires `www.douyin.com_cookies.txt` (export via "Get cookies.txt LOCALLY" browser extension)
+- **Douyin**: Requires `douyin_cookies.txt` (export via "Get cookies.txt LOCALLY" browser extension)
 - **Bilibili**: yt-dlp handles cookies automatically, but `--cookies-from-browser chrome` option available
 
-## Prompt Templates
-
-The `prompt/` directory contains specialized summarization strategies:
-- `explain_theory_strategy.md` - Theory explanation
-- `skill_execution_strategy.md` - Skill/tutorial content
-- `finance_risk_strategy.md` - Financial risk analysis
-- `biography_transfer_strategy.md` - Biography content
-- `opinion_analysis_strategy.md` - Opinion/argument analysis
-
-These are used by the LLM to adapt summarization style based on content type.
+See [docs/douyin-cookies-setup.md](docs/douyin-cookies-setup.md) for detailed setup instructions.
 
 ## Important Notes
 
 - **FFmpeg is mandatory** for all audio/video operations
-- **Long videos** (30-60+ min): Use `--prod` flag to avoid SSE disconnections
-- **Task persistence**: Tasks are saved in `temp/tasks.json` - survives service restarts
+- **Long videos** (30-60+ min): Use production mode for stability
+- **Task persistence**: Tasks are saved in PostgreSQL - survives service restarts
 - **File naming**: Sanitized titles with 6-character task ID suffix
 - **Translation**: Only triggered when detected language differs from summary language selection
-- **Output location**: AI-Video-Transcriber outputs to `temp/`; CLI tools output to `outputs/` or specified directory
-- **Feishu Event Mode**: Use WebSocket mode (default) for simplified deployment without public IP. See `docs/feishu-websocket-setup.md` for setup guide.
+- **Local vs Docker**: Different host configurations (localhost vs container names)
+- **Python 3.13 compatibility**: Use python-telegram-bot >= 22.6 and redis[hiredis] >= 5.0.0
+
+## Troubleshooting
+
+### Telegram Bot Not Responding
+1. Check if bot process is running: `ps aux | grep telegram_bot`
+2. Check logs: `tail -f telegram_bot.log`
+3. Verify database and Redis are accessible
+4. Restart bot: `pkill -f start_telegram_bot && python3 start_telegram_bot.py`
+
+### Douyin Video Download Fails
+1. Check if `douyin_cookies.txt` exists and is not empty
+2. Verify cookies are fresh (not expired)
+3. Re-export cookies from browser after logging in
+4. See [docs/douyin-cookies-setup.md](docs/douyin-cookies-setup.md)
+
+### Database Connection Issues
+- For local execution: Use `DB_HOST=localhost`
+- For Docker execution: Use `DB_HOST=db`
+- Ensure PostgreSQL is running and accessible on port 5432

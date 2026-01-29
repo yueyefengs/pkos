@@ -32,9 +32,9 @@ services:
     image: postgres:15-alpine
     container_name: pkos-db
     environment:
-      - POSTGRES_USER=feishu
-      - POSTGRES_PASSWORD=feishu123
-      - POSTGRES_DB=feishu_knowledge
+      - POSTGRES_USER=pkos
+      - POSTGRES_PASSWORD=pkos123
+      - POSTGRES_DB=pkos_knowledge
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped

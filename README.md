@@ -1,6 +1,6 @@
 # PKOS - 个人知识组织系统
 
-将碎片化的视频信息转化为可复用的个人知识。支持飞书和Telegram两种接入方式。
+将碎片化的视频信息转化为可复用的个人知识。通过Telegram Bot提供智能对话和学习助手功能。
 
 ## 功能特性
 
@@ -12,10 +12,6 @@
 - 🎓 学习模式(苏格拉底式教学)
 - 📊 学习进度追踪
 - 📝 内容分析(大纲/总结/Q&A/扩展阅读)
-
-### 平台支持
-- **飞书Bot**: 自动保存到飞书多维表格
-- **Telegram Bot**: 智能对话和学习助手(新)
 
 ### 技术特性
 - 多LLM支持：OpenAI、DeepSeek、GLM、Claude
@@ -33,70 +29,66 @@ cp .env.example .env
 ```
 
 编辑 `.env` 文件，配置以下信息：
-- 飞书应用ID和密钥
-- 飞书多维表格token和table_id
+- Telegram Bot Token
 - LLM API密钥
+- 数据库配置
 
-### 2. 配置飞书应用
+### 2. 启动服务
 
-1. 在飞书开放平台创建自建应用
-2. 开启机器人能力，获取权限：获取与发送消息、读写多维表格
-3. 配置事件订阅：`/feishu/events`
-
-### 3. 启动服务
+**方式一：使用Docker（推荐）**
 
 开发模式：
-
 ```bash
 docker-compose -f docker/docker-compose.dev.yml up
 ```
 
 生产模式：
-
 ```bash
 docker-compose -f docker/docker-compose.yml up -d
 ```
 
-### 4. Telegram Bot部署
+**方式二：本地运行**
 
-详细配置请查看: [docs/telegram-bot-setup.md](docs/telegram-bot-setup.md)
-
-快速启动:
 ```bash
-# 1. 配置Telegram Bot Token
-# 编辑 .env 文件,添加:
-TELEGRAM_BOT_TOKEN=your_bot_token_here
-
-# 2. 确保Redis和PostgreSQL已运行
+# 1. 确保Redis和PostgreSQL已运行
 redis-server &
 # PostgreSQL应已在运行
 
-# 3. 启动Telegram Bot
+# 2. 启动Telegram Bot
 python3 start_telegram_bot.py
 ```
 
-### 5. 使用
+### 3. 配置抖音Cookies
 
-**飞书Bot**: 在飞书中@机器人发送视频链接，机器人会自动处理并保存到多维表格。
+抖音视频下载需要有效的cookies文件。详细配置请查看: [docs/douyin-cookies-setup.md](docs/douyin-cookies-setup.md)
 
-**Telegram Bot**:
-1. 发送视频链接进行处理
-2. 使用`/chat [任务ID]`激活对话
-3. 直接提问或使用`/help`查看所有命令
+快速配置:
+1. 安装浏览器扩展 "Get cookies.txt LOCALLY"
+2. 登录 www.douyin.com
+3. 导出cookies并保存为 `douyin_cookies.txt`
 
-详细使用说明: [docs/telegram-bot-setup.md](docs/telegram-bot-setup.md)
+### 4. 使用Telegram Bot
+
+详细配置和使用说明请查看: [docs/telegram-bot-setup.md](docs/telegram-bot-setup.md)
+
+基本使用:
+1. 在Telegram搜索并启动你的Bot
+2. 发送视频链接进行处理
+3. 使用`/chat [任务ID]`激活对话模式
+4. 使用`/learn [任务ID]`激活学习模式
+5. 直接提问或使用`/help`查看所有命令
 
 ## 目录结构
 
 ```
-feishu-knowledge-bot/
-├── bot/              # 飞书机器人模块
+pkos/
+├── bot/              # Telegram机器人模块
 ├── processors/       # 视频处理模块
 ├── models/           # 数据模型
 ├── storage/          # 数据库存储
 ├── config/           # 配置文件
 ├── docker/           # Docker配置
-└── temp/             # 临时文件
+└── docs/             # 文档
 ```
 
 ## License

@@ -17,4 +17,4 @@ RUN mkdir -p temp storage log
 EXPOSE 8080
 
 # 启动命令
-CMD ["uvicorn", "bot.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["python3", "start_telegram_bot.py"]

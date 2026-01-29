@@ -1,6 +1,5 @@
 fastapi
 uvicorn[standard]
-lark-oapi
 pytest
 pytest-asyncio
 asyncpg

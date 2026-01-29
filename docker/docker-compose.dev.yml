@@ -11,7 +11,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    command: uvicorn bot.main:app --host 0.0.0.0 --port 8080 --reload
+    command: python3 start_telegram_bot.py
     volumes:
       - ..:/app
       - /app/__pycache__
@@ -36,9 +36,9 @@ services:
     container_name: pkos-db
     image: postgres:15-alpine
     environment:
-      - POSTGRES_USER=feishu
-      - POSTGRES_PASSWORD=feishu123
-      - POSTGRES_DB=feishu_knowledge
+      - POSTGRES_USER=pkos
+      - POSTGRES_PASSWORD=pkos123
+      - POSTGRES_DB=pkos_knowledge
     ports:
       - "5432:5432"
     volumes:

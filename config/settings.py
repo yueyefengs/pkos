@@ -5,25 +5,12 @@ from pathlib import Path
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
-    # 飞书应用配置
-    feishu_app_id: str
-    feishu_app_secret: str
-    feishu_bot_name: str = "知识助手"
-    feishu_encrypt_key: Optional[str] = None
-
-    # 飞书事件接收模式: "webhook" 或 "websocket"
-    feishu_event_mode: Literal["webhook", "websocket"] = "websocket"
-
-    # 飞书多维表格配置
-    feishu_bitable_token: str
-    feishu_bitable_table_id: str
-
     # 数据库配置
     db_host: str = "db"
     db_port: int = 5432
-    db_user: str = "feishu"
-    db_password: str = "feishu123"
-    db_name: str = "feishu_knowledge"
+    db_user: str = "pkos"
+    db_password: str = "pkos123"
+    db_name: str = "pkos_knowledge"
 
     # Redis配置
     redis_host: str = "redis"
