@@ -13,7 +13,9 @@ class PostgresStorage:
 
     async def connect(self):
         """连接到PostgreSQL数据库"""
-        self.pool = await asyncpg.create_pool(settings.database_url)
+        # asyncpg需要标准的postgresql://格式，不是SQLAlchemy的postgresql+asyncpg://
+        db_url = f"postgresql://{settings.db_user}:{settings.db_password}@{settings.db_host}:{settings.db_port}/{settings.db_name}"
+        self.pool = await asyncpg.create_pool(db_url)
         await self._init_db()
 
     async def disconnect(self):
