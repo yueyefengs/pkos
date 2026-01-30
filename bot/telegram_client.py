@@ -126,11 +126,26 @@ class TelegramClient:
         Returns:
             转义后的文本
         """
-        # Telegram Markdown 特殊字符
-        escape_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-        for char in escape_chars:
-            text = text.replace(char, f'\\{char}')
-        return text
+        return escape_markdown_v2(text)
+
+
+def escape_markdown_v2(text: str) -> str:
+    """
+    转义 Telegram Markdown V2 特殊字符（公共函数）
+
+    Args:
+        text: 原始文本
+
+    Returns:
+        转义后的文本
+    """
+    if not text:
+        return ""
+    # Telegram Markdown 特殊字符
+    escape_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+    for char in escape_chars:
+        text = text.replace(char, f'\\{char}')
+    return text
 
 
 # 全局客户端实例

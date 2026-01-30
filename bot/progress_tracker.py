@@ -5,7 +5,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 from bot.session_manager import get_session_manager
-from bot.telegram_client import get_telegram_client
+from bot.telegram_client import get_telegram_client, escape_markdown_v2
 from storage.postgres import storage
 from models.task import LearningStatus
 from config.logger import logger
@@ -149,7 +149,7 @@ async def workspace_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 LearningStatus.REVIEWING: "🔵"
             }
 
-            message += f"{status_emoji.get(progress.status, '⚪')} **{task.title}**\n"
+            message += f"{status_emoji.get(progress.status, '⚪')} **{escape_markdown_v2(task.title)}**\n"
             message += f"   学习 {progress.study_time // 60} 分钟 | 提问 {progress.questions_asked} 次\n"
             message += f"   任务ID: `{task.id}`\n\n"
 
@@ -161,7 +161,7 @@ async def workspace_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Failed to show workspace progress: {e}")
         await client.send_message(
             chat_id,
-            f"❌ 获取工作区进度失败: {str(e)}"
+            f"❌ 获取工作区进度失败: {escape_markdown_v2(str(e))}"
         )
 
 

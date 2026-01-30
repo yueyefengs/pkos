@@ -5,7 +5,7 @@ Telegram Bot命令处理器
 from telegram import Update
 from telegram.ext import ContextTypes
 from bot.session_manager import get_session_manager
-from bot.telegram_client import get_telegram_client
+from bot.telegram_client import get_telegram_client, escape_markdown_v2
 from storage.postgres import storage
 from config.logger import logger
 
@@ -98,7 +98,7 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         message = "📜 **最近处理的视频:**\n\n"
         for task in tasks:
-            message += f"• **{task.title}**\n"
+            message += f"• **{escape_markdown_v2(task.title)}**\n"
             message += f"  ID: `{task.id}` | 平台: {task.platform}\n"
             message += f"  完成时间: {task.completed_at.strftime('%Y-%m-%d %H:%M')}\n\n"
 
@@ -110,7 +110,7 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Failed to get history: {e}")
         await client.send_message(
             str(update.effective_chat.id),
-            f"获取历史记录失败: {str(e)}"
+            f"获取历史记录失败: {escape_markdown_v2(str(e))}"
         )
 
 
@@ -160,7 +160,7 @@ async def chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await client.send_message(
             str(update.effective_chat.id),
-            f"✅ 已激活文章: **{task.title}**\n"
+            f"✅ 已激活文章: **{escape_markdown_v2(task.title)}**\n"
             f"模式: 普通对话\n\n"
             f"现在你可以针对这篇文章提问了!"
         )
@@ -169,7 +169,7 @@ async def chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Failed to activate chat: {e}")
         await client.send_message(
             str(update.effective_chat.id),
-            f"激活失败: {str(e)}"
+            f"激活失败: {escape_markdown_v2(str(e))}"
         )
 
 
@@ -224,7 +224,7 @@ async def learn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await client.send_message(
             str(update.effective_chat.id),
-            f"🎓 已激活学习模式: **{task.title}**\n\n"
+            f"🎓 已激活学习模式: **{escape_markdown_v2(task.title)}**\n\n"
             f"学习模式特点:\n"
             f"• 苏格拉底式教学方法\n"
             f"• 引导你主动思考\n"
@@ -237,7 +237,7 @@ async def learn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Failed to activate learning mode: {e}")
         await client.send_message(
             str(update.effective_chat.id),
-            f"激活学习模式失败: {str(e)}"
+            f"激活学习模式失败: {escape_markdown_v2(str(e))}"
         )
 
 
@@ -273,7 +273,7 @@ async def context_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message += f"对话轮数: {workspace_info['message_count']}\n\n"
 
         for task in workspace_tasks:
-            message += f"• **{task.title}**\n"
+            message += f"• **{escape_markdown_v2(task.title)}**\n"
             message += f"  ID: `{task.id}` | 平台: {task.platform}\n\n"
 
         await client.send_message(str(update.effective_chat.id), message)
@@ -282,7 +282,7 @@ async def context_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Failed to get context: {e}")
         await client.send_message(
             str(update.effective_chat.id),
-            f"获取工作区信息失败: {str(e)}"
+            f"获取工作区信息失败: {escape_markdown_v2(str(e))}"
         )
 
 
@@ -355,7 +355,7 @@ async def add_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await client.send_message(
             str(update.effective_chat.id),
-            f"✅ 已添加: **{task.title}**\n"
+            f"✅ 已添加: **{escape_markdown_v2(task.title)}**\n"
             f"工作区文章数: {len(workspace_info['task_ids'])}"
         )
 
@@ -363,7 +363,7 @@ async def add_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Failed to add to workspace: {e}")
         await client.send_message(
             str(update.effective_chat.id),
-            f"添加失败: {str(e)}"
+            f"添加失败: {escape_markdown_v2(str(e))}"
         )
 
 
@@ -397,12 +397,12 @@ async def mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         mode_name = "普通对话" if mode == "normal" else "学习模式"
         await client.send_message(
             str(update.effective_chat.id),
-            f"✅ 已切换到: **{mode_name}**"
+            f"✅ 已切换到: **{escape_markdown_v2(mode_name)}**"
         )
 
     except Exception as e:
         logger.error(f"Failed to switch mode: {e}")
         await client.send_message(
             str(update.effective_chat.id),
-            f"切换模式失败: {str(e)}"
+            f"切换模式失败: {escape_markdown_v2(str(e))}"
         )
