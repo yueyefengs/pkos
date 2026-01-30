@@ -25,6 +25,11 @@ services:
       - DB_PORT=5432
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      # 代理配置：Docker容器内访问宿主机代理
+      # macOS/Windows: 使用 host.docker.internal
+      # Linux: 使用宿主机IP或 --add-host=host.docker.internal:host-gateway
+      - HTTP_PROXY=http://host.docker.internal:7897
+      - HTTPS_PROXY=http://host.docker.internal:7897
     volumes:
       - ./log:/app/log
 

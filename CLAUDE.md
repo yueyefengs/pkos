@@ -82,6 +82,15 @@ docker-compose -f docker/docker-compose.yml up -d
 docker-compose -f docker/docker-compose.yml down
 ```
 
+**Proxy Configuration for Docker**:
+- macOS/Windows: Proxy configured to use `host.docker.internal:7897` (accesses host machine)
+- Linux: If proxy connection fails, add to docker-compose.yml:
+  ```yaml
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  ```
+- Proxy environment variables are automatically overridden in container
+
 ## Architecture
 
 ### Project Structure

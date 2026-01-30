@@ -32,10 +32,23 @@ cp .env.example .env
 - Telegram Bot Token
 - LLM API密钥
 - 数据库配置
+- **代理配置（中国大陆必需）**：
+  ```bash
+  HTTP_PROXY=http://127.0.0.1:7897
+  HTTPS_PROXY=http://127.0.0.1:7897
+  ```
 
 ### 2. 启动服务
 
 **方式一：使用Docker（推荐）**
+
+⚠️ **代理注意事项**：
+- macOS/Windows用户：Docker自动使用`host.docker.internal`访问宿主机代理
+- Linux用户：如果代理连接失败，需要在docker-compose.yml中添加：
+  ```yaml
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  ```
 
 开发模式：
 ```bash
