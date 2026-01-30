@@ -145,11 +145,17 @@ class DouyinCrawlerDownloader:
             raise Exception(f"ffmpeg音频提取失败: {result.stderr}")
 
     def _sanitize_title(self, title: str) -> str:
-        """清理标题为安全的文件名"""
+        """清理标题为安全的文件名
+
+        限制长度以避免超过文件系统的255字节限制。
+        考虑到中文字符占3字节，aweme_id约20字节，后缀.m4a约4字节，
+        标题限制为30个字符可确保总文件名不超过150字节。
+        """
         import re
         safe = re.sub(r"[^\w\-\s]", "", title)
         safe = re.sub(r"\s+", "_", safe).strip("._-")
-        return safe[:80] or "douyin_video"
+        # 限制为30个字符，避免文件名过长（特别是中文标题）
+        return safe[:30] or "douyin_video"
 
 
 # 全局实例（懒加载）

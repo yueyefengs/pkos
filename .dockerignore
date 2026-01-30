@@ -1,0 +1,46 @@
+# Temporary files
+temp/
+*.tmp
+*.log
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Git
+.git/
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# External dependencies (not needed in container)
+Douyin_TikTok_Download_API/
+
+# Documentation (unless needed)
+docs/
+*.md
+!README.md
+
+# Test files
+tests/
+*.test.py
