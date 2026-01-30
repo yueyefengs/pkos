@@ -12,3 +12,13 @@ pydantic-settings
 python-dotenv
 python-telegram-bot>=22.6  # Python 3.13兼容版本
 redis[hiredis]>=5.0.0
+
+# Douyin专业爬虫依赖
+httpx==0.27.0
+gmssl==3.2.2
+browser-cookie3==0.20.1
+lz4
+rich
+pycryptodomex
+pyyaml
+tenacity

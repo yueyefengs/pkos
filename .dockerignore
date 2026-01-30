@@ -33,8 +33,15 @@ env/
 .DS_Store
 Thumbs.db
 
-# External dependencies (not needed in container)
-Douyin_TikTok_Download_API/
+# External dependencies (selectively include needed parts)
+Douyin_TikTok_Download_API/.git/
+Douyin_TikTok_Download_API/app/
+Douyin_TikTok_Download_API/screenshots/
+Douyin_TikTok_Download_API/docs/
+Douyin_TikTok_Download_API/*.md
+Douyin_TikTok_Download_API/start.py
+Douyin_TikTok_Download_API/bash/
+# Keep: Douyin_TikTok_Download_API/crawlers/ (needed by douyin_crawler_downloader.py)
 
 # Documentation (unless needed)
 docs/
