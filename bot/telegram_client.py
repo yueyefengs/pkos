@@ -110,9 +110,27 @@ class TelegramClient:
         }
 
         emoji = emoji_map.get(stage, "ℹ️")
-        full_message = f"{emoji} **{stage.upper()}**\n{message}"
+        # 转义 Markdown 特殊字符，避免解析错误
+        escaped_message = self._escape_markdown(message)
+        full_message = f"{emoji} **{stage.upper()}**\n{escaped_message}"
 
         await self.send_message(chat_id, full_message)
+
+    def _escape_markdown(self, text: str) -> str:
+        """
+        转义 Telegram Markdown 特殊字符
+
+        Args:
+            text: 原始文本
+
+        Returns:
+            转义后的文本
+        """
+        # Telegram Markdown 特殊字符
+        escape_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+        for char in escape_chars:
+            text = text.replace(char, f'\\{char}')
+        return text
 
 
 # 全局客户端实例
