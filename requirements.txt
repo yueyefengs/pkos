@@ -15,7 +15,7 @@ redis[hiredis]>=5.0.0
 
 # Douyin专业爬虫依赖 (来源: Douyin_TikTok_Download_API)
 # 核心依赖
-httpx==0.27.0
+httpx>=0.27.1,<0.28.0  # mcp requires >=0.27.1; stay within 0.27.x for douyin compat
 gmssl==3.2.2
 browser-cookie3==0.19.1  # 使用上游版本
 lz4==4.3.3
@@ -32,4 +32,4 @@ websockets==12.0
 aiofiles==23.2.1
 
 # MCP Server (HTTP transport)
-mcp[cli]>=1.0.0
+mcp[cli]>=1.0.0,<2.0.0
