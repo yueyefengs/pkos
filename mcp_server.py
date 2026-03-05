@@ -10,7 +10,7 @@ import json
 import logging
 import uuid
 from mcp.server.fastmcp import FastMCP
-from storage.postgres import PostgresStorage
+from storage.postgres import storage as db
 from models.task import TaskCreate
 from processors.video_downloader import video_downloader
 from processors.transcriber import transcriber
@@ -53,8 +53,6 @@ async def process_video(url: str) -> str:
         processed_content = await content_processor.process(raw_content, title)
         logger.info(f"Processed: {len(processed_content)} chars")
 
-        storage = PostgresStorage()
-        await storage.connect()
         platform = _detect_platform(url)
         task_uuid = str(uuid.uuid4())[:8]
         task_create = TaskCreate(
@@ -62,15 +60,18 @@ async def process_video(url: str) -> str:
             video_url=url,
             platform=platform
         )
-        task = await storage.create_task(task_create)
-        await storage.update_task(
-            task.task_id,
-            status="completed",
-            title=title,
-            content=processed_content,
-            raw_transcript=raw_content
-        )
-        await storage.disconnect()
+        try:
+            await db.connect()
+            task = await db.create_task(task_create)
+            await db.update_task(
+                task.task_id,
+                status="completed",
+                title=title,
+                content=processed_content,
+                raw_transcript=raw_content
+            )
+        finally:
+            await db.disconnect()
 
         summary = await analyzer.generate_summary(processed_content)
 
@@ -94,10 +95,11 @@ async def list_tasks(limit: int = 10) -> str:
     使用返回的 task_id 调用 chat_content 或 analyze_content 进行进一步操作。"""
     logger.info(f"list_tasks: limit={limit}")
     try:
-        storage = PostgresStorage()
-        await storage.connect()
-        tasks = await storage.get_recent_tasks(limit=limit)
-        await storage.disconnect()
+        try:
+            await db.connect()
+            tasks = await db.get_recent_tasks(limit=limit)
+        finally:
+            await db.disconnect()
 
         if not tasks:
             return "暂无已处理的视频记录。"
@@ -125,10 +127,11 @@ async def get_task(task_id: int) -> str:
     task_id 来自 list_tasks 的返回结果。"""
     logger.info(f"get_task: task_id={task_id}")
     try:
-        storage = PostgresStorage()
-        await storage.connect()
-        task = await storage.get_task_by_id(task_id)
-        await storage.disconnect()
+        try:
+            await db.connect()
+            task = await db.get_task_by_id(task_id)
+        finally:
+            await db.disconnect()
 
         if not task:
             return f"未找到 task_id={task_id} 的任务。"
@@ -159,10 +162,11 @@ async def chat_content(task_id: int, question: str, mode: str = "normal") -> str
     mode: 'normal'（直接回答）或 'learning'（苏格拉底式，通过提问引导思考，不直接给答案）。"""
     logger.info(f"chat_content: task_id={task_id}, mode={mode}")
     try:
-        storage = PostgresStorage()
-        await storage.connect()
-        task = await storage.get_task_by_id(task_id)
-        await storage.disconnect()
+        try:
+            await db.connect()
+            task = await db.get_task_by_id(task_id)
+        finally:
+            await db.disconnect()
 
         if not task:
             return f"未找到 task_id={task_id} 的任务。"
@@ -193,10 +197,11 @@ async def analyze_content(task_id: int, type: str = "summary") -> str:
     - 'extensions': 扩展思考方向（仅提供思考方向，不给出答案）"""
     logger.info(f"analyze_content: task_id={task_id}, type={type}")
     try:
-        storage = PostgresStorage()
-        await storage.connect()
-        task = await storage.get_task_by_id(task_id)
-        await storage.disconnect()
+        try:
+            await db.connect()
+            task = await db.get_task_by_id(task_id)
+        finally:
+            await db.disconnect()
 
         if not task:
             return f"未找到 task_id={task_id} 的任务。"
