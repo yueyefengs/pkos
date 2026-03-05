@@ -38,8 +38,22 @@ class PostgresStorage:
             updated_at TIMESTAMP DEFAULT NOW(),
             completed_at TIMESTAMP,
             error_message TEXT,
-            content TEXT
+            content TEXT,
+            raw_transcript TEXT
         );
+        """
+
+        # 迁移：为现有表添加 raw_transcript 字段（如果不存在）
+        add_raw_transcript_column = """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'tasks' AND column_name = 'raw_transcript'
+            ) THEN
+                ALTER TABLE tasks ADD COLUMN raw_transcript TEXT;
+            END IF;
+        END $$;
         """
 
         # 学习进度表
@@ -84,6 +98,7 @@ class PostgresStorage:
 
         async with self.pool.acquire() as conn:
             await conn.execute(create_tasks_table)
+            await conn.execute(add_raw_transcript_column)  # 迁移：添加新字段
             await conn.execute(create_learning_progress_table)
             await conn.execute(create_concept_mastery_table)
             await conn.execute(create_learning_checkpoints_table)
@@ -155,7 +170,8 @@ class PostgresStorage:
             updated_at=record["updated_at"],
             completed_at=record["completed_at"],
             error_message=record["error_message"],
-            content=record["content"]
+            content=record["content"],
+            raw_transcript=record.get("raw_transcript")  # 使用 get 以兼容旧数据
         )
 
     # ===== 学习进度相关方法 =====
@@ -222,7 +238,7 @@ class PostgresStorage:
                     lp.last_position, lp.created_at as lp_created_at, lp.updated_at as lp_updated_at,
                     t.id as t_id, t.task_id as t_task_id, t.video_url, t.title,
                     t.platform, t.status as t_status, t.created_at as t_created_at,
-                    t.updated_at as t_updated_at, t.completed_at, t.error_message, t.content
+                    t.updated_at as t_updated_at, t.completed_at, t.error_message, t.content, t.raw_transcript
                 FROM learning_progress lp
                 JOIN tasks t ON lp.task_id = t.id
                 WHERE lp.user_id = $1
@@ -255,7 +271,8 @@ class PostgresStorage:
                 updated_at=record["t_updated_at"],
                 completed_at=record["completed_at"],
                 error_message=record["error_message"],
-                content=record["content"]
+                content=record["content"],
+                raw_transcript=record.get("raw_transcript")
             )
             result.append((progress, task))
         return result

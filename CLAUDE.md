@@ -96,6 +96,93 @@ extra_hosts:
 - Use `.env` file with `HTTP_PROXY=${HTTP_PROXY:-}` syntax
 - Document proxy requirements in README
 
+**CRITICAL**: python-telegram-bot library does NOT automatically use `HTTP_PROXY` / `HTTPS_PROXY` environment variables. You MUST explicitly configure proxy in code:
+
+```python
+from telegram.request import HTTPXRequest
+import os
+
+# For Bot instance (sending messages)
+proxy_url = os.getenv('HTTPS_PROXY') or os.getenv('HTTP_PROXY')
+if proxy_url:
+    # Note: parameter name is 'proxy', not 'proxy_url'
+    request = HTTPXRequest(proxy=proxy_url, connect_timeout=30.0, read_timeout=30.0, write_timeout=30.0)
+    bot = Bot(token=TOKEN, request=request)
+
+# For Application.builder() (polling updates)
+if proxy_url:
+    request = HTTPXRequest(proxy=proxy_url, ...)
+    get_updates_request = HTTPXRequest(proxy=proxy_url, ...)
+    builder = Application.builder().token(TOKEN).request(request).get_updates_request(get_updates_request)
+```
+
+**Files modified**:
+- `bot/telegram_client.py:18-36` - Added proxy configuration to Bot initialization
+- `bot/telegram_main.py:91-122` - Added proxy configuration to Application builder
+
+**Symptom if not configured**: `telegram.error.NetworkError: httpx.ConnectError` when sending messages or polling updates
+
+### LLM Call Logging
+
+**All LLM API calls are automatically logged** for debugging and cost optimization:
+
+```
+[LLM Call #1] operation=classify_content | model=openai/gpt-4o | input=1000 chars | output=6 chars | duration=1.23s | tokens(in=250, out=2, total=252)
+[LLM Call #2] operation=optimize_content | model=openai/gpt-4o | input=15234 chars | output=14987 chars | duration=8.45s | tokens(in=3800, out=3750, total=7550)
+[LLM Call #3] operation=optimize_content_chunk_1/3 | model=openai/gpt-4o | input=25000 chars | output=24500 chars | duration=12.34s | tokens(in=6250, out=6125, total=12375)
+[LLM Call #4] operation=generate_chat_response | model=claude/claude-3-5-sonnet-20241022 | input=2500 chars | output=850 chars | duration=3.21s | tokens(in=625, out=213, total=838)
+```
+
+**Log information**:
+- Operation type (optimize_content, classify_content, generate_chat_response, etc.)
+- Model name and type
+- Input/output character counts
+- Duration in seconds
+- Token usage (input, output, total)
+- Error messages (if failed)
+
+**Implementation**: `processors/llm_client.py:44-77` - `_log_llm_call()` method
+
+**Use cases**:
+- Monitor token consumption per operation
+- Identify expensive operations
+- Debug content truncation issues
+- Optimize prompt efficiency
+- Estimate API costs
+
+**Log analysis tool**:
+```bash
+# 分析日志文件中的LLM调用统计
+python3 scripts/analyze_llm_logs.py log/pkos.log
+
+# 或在Docker容器中
+docker exec pkos python3 scripts/analyze_llm_logs.py log/pkos.log
+```
+
+**示例输出**:
+```
+================================================================================
+LLM调用统计报告
+================================================================================
+
+总调用次数: 45 (成功: 43, 失败: 2)
+总token消耗: 125,432 (输入: 85,234, 输出: 40,198)
+总耗时: 234.56秒 (平均每次: 5.21秒)
+
+估算成本:
+  GPT-4o:         $0.6148
+  Claude 3.5:     $0.8589
+
+================================================================================
+按操作类型统计
+================================================================================
+操作类型                             调用次数       Token消耗      耗时(秒)      平均耗时
+--------------------------------------------------------------------------------
+optimize_content                           15          78,542       145.23         9.68
+generate_chat_response                     25          38,765        76.34         3.05
+classify_content                            5           8,125        12.99         2.60
+```
+
 ## Common Commands
 
 ### Video Downloaders

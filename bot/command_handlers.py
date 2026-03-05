@@ -100,7 +100,8 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for task in tasks:
             message += f"• **{escape_markdown_v2(task.title)}**\n"
             message += f"  ID: `{task.id}` | 平台: {task.platform}\n"
-            message += f"  完成时间: {task.completed_at.strftime('%Y-%m-%d %H:%M')}\n\n"
+            completed_str = task.completed_at.strftime('%Y-%m-%d %H:%M') if task.completed_at else "未知"
+            message += f"  完成时间: {completed_str}\n\n"
 
         message += "\n使用 `/chat [ID]` 激活文章进行对话"
 

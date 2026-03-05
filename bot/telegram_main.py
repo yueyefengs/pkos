@@ -3,12 +3,14 @@ Telegram Bot主程序
 整合所有功能模块,启动bot服务
 """
 import asyncio
+import os
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
     filters
 )
+from telegram.request import HTTPXRequest
 from bot.telegram_client import get_telegram_client
 from bot.session_manager import get_session_manager
 from bot.command_handlers import (
@@ -86,10 +88,35 @@ def main():
     """主函数 - 创建并运行bot"""
     logger.info("Starting Telegram bot...")
 
+    # 配置代理（从环境变量读取）
+    proxy_url = os.getenv('HTTPS_PROXY') or os.getenv('HTTP_PROXY')
+
     # 创建Application
+    builder = Application.builder().token(settings.telegram_bot_token)
+
+    if proxy_url:
+        logger.info(f"Configuring Application with proxy: {proxy_url}")
+        # 创建带代理的请求对象
+        # 注意：参数名是 proxy，不是 proxy_url
+        request = HTTPXRequest(
+            proxy=proxy_url,
+            connect_timeout=30.0,
+            read_timeout=30.0,
+            write_timeout=30.0
+        )
+        # get_updates 用于轮询，也需要配置代理
+        get_updates_request = HTTPXRequest(
+            proxy=proxy_url,
+            connect_timeout=30.0,
+            read_timeout=30.0,
+            write_timeout=30.0
+        )
+        builder = builder.request(request).get_updates_request(get_updates_request)
+    else:
+        logger.info("No proxy configured for Application")
+
     application = (
-        Application.builder()
-        .token(settings.telegram_bot_token)
+        builder
         .post_init(post_init)
         .post_shutdown(post_shutdown)
         .build()

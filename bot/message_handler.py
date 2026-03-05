@@ -151,11 +151,15 @@ class MessageHandler:
             logger.info(f"Processed content for task {task_id}")
 
             # 4. 更新任务状态
+            # 同时保存原始转录(raw_transcript)和优化后内容(content)
+            # raw_transcript: 完整的原始转录，不受LLM token限制影响
+            # content: LLM优化后的内容，用于对话和展示
             await storage.update_task(
                 task_id,
                 title=title,
                 status="completed",
-                content=processed_content
+                raw_transcript=raw_content,  # 保存完整原始转录
+                content=processed_content     # 保存优化后内容
             )
 
             # 5. 发送完成通知

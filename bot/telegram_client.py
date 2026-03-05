@@ -4,7 +4,9 @@ Telegram Bot API客户端封装
 """
 from telegram import Bot
 from telegram.constants import ParseMode
+from telegram.request import HTTPXRequest
 from typing import Optional
+import os
 from config.settings import settings
 from config.logger import logger
 
@@ -15,7 +17,24 @@ class TelegramClient:
 
     async def initialize(self):
         """初始化Bot实例"""
-        self.bot = Bot(token=settings.telegram_bot_token)
+        # 配置代理（从环境变量读取）
+        proxy_url = os.getenv('HTTPS_PROXY') or os.getenv('HTTP_PROXY')
+
+        if proxy_url:
+            logger.info(f"Using proxy: {proxy_url}")
+            # 创建带代理的请求对象
+            # 注意：参数名是 proxy，不是 proxy_url
+            request = HTTPXRequest(
+                proxy=proxy_url,
+                connect_timeout=30.0,
+                read_timeout=30.0,
+                write_timeout=30.0
+            )
+            self.bot = Bot(token=settings.telegram_bot_token, request=request)
+        else:
+            logger.info("No proxy configured, connecting directly")
+            self.bot = Bot(token=settings.telegram_bot_token)
+
         logger.info(f"Telegram bot initialized: {settings.telegram_bot_username}")
 
     async def send_message(

@@ -19,7 +19,8 @@ class Task(BaseModel):
     updated_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     error_message: Optional[str] = Field(None, description="Error message if failed")
-    content: Optional[str] = Field(None, description="Processed content")
+    content: Optional[str] = Field(None, description="Processed content (optimized by LLM)")
+    raw_transcript: Optional[str] = Field(None, description="Raw transcription from audio (complete, unprocessed)")
 
 class TaskCreate(BaseModel):
     task_id: str
@@ -31,6 +32,7 @@ class TaskUpdate(BaseModel):
     title: Optional[str] = None
     error_message: Optional[str] = None
     content: Optional[str] = None
+    raw_transcript: Optional[str] = None
     completed_at: Optional[datetime] = None
 
 # 学习进度相关模型
