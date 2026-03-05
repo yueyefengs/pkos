@@ -35,6 +35,29 @@ services:
     volumes:
       - ./log:/app/log
 
+  pkos-mcp:
+    image: ${IMAGE_NAME:-yueyefeng11/pkos:latest}
+    container_name: pkos-mcp
+    command: python3 mcp_server.py
+    ports:
+      - "9000:9000"
+    env_file:
+      - ../.env
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - HTTP_PROXY=http://host.docker.internal:7897
+      - HTTPS_PROXY=http://host.docker.internal:7897
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
   db:
     image: postgres:15-alpine
     container_name: pkos-db
