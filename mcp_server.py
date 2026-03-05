@@ -24,7 +24,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("pkos-mcp")
 
-mcp = FastMCP("pkos")
+mcp = FastMCP("pkos", host="0.0.0.0", port=9000)
 analyzer = ContentAnalyzer()
 engine = ConversationEngine()
 
@@ -228,4 +228,4 @@ async def analyze_content(task_id: int, type: str = "summary") -> str:
 
 if __name__ == "__main__":
     logger.info("Starting PKOS MCP server on port 9000 (streamable-http)...")
-    mcp.run(transport="streamable-http", host="0.0.0.0", port=9000)
+    mcp.run(transport="streamable-http")
