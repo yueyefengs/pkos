@@ -23,6 +23,7 @@ RUN mkdir -p temp storage log
 
 # 暴露端口
 EXPOSE 8080
+EXPOSE 9000
 
 # 启动命令
 CMD ["python3", "start_telegram_bot.py"]
