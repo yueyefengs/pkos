@@ -91,3 +91,28 @@ async def test_query_vault_disabled_when_no_vault():
 async def test_query_vault_empty_vault(vault):
     result = await vault.query_vault("任何问题")
     assert "为空" in result
+
+
+@pytest.mark.asyncio
+async def test_ingest_content_creates_file(vault, tmp_path):
+    with patch('storage.obsidian.llm_client') as mock_llm:
+        mock_llm.generate_chat_response = AsyncMock(side_effect=["这是摘要", "教育"])
+        result = await vault.ingest_content(
+            content="文章正文内容",
+            source_type="article",
+            source_url="https://example.com",
+            title="测试文章"
+        )
+    assert result is True
+    files = list(tmp_path.rglob("*.md"))
+    assert len(files) == 1
+    text = files[0].read_text(encoding="utf-8")
+    assert "测试文章" in text
+    assert "这是摘要" in text
+    assert "文章正文内容" in text
+
+
+@pytest.mark.asyncio
+async def test_ingest_content_returns_false_for_empty_content(vault):
+    result = await vault.ingest_content(content="", source_type="note")
+    assert result is False

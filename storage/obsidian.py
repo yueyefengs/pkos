@@ -224,6 +224,37 @@ class ObsidianStorage:
         asyncio.create_task(self._writeback_knowledge(question, answer, relevant_paths))
         return answer
 
+    async def ingest_content(self, content: str, source_type: str, source_url: str = "", title: str = "") -> bool:
+        """将网页文章或个人笔记写入 Obsidian Vault"""
+        if not self._is_enabled():
+            return False
+        if not content.strip():
+            return False
+        try:
+            infer_title = title or f"{source_type}-{datetime.now().strftime('%H%M%S')}"
+            summary, topic = await asyncio.gather(
+                self._generate_summary(content, infer_title),
+                self._classify_topic(content, infer_title),
+            )
+            note_dir = self.vault_path / topic
+            note_dir.mkdir(parents=True, exist_ok=True)
+            date_str = datetime.now().strftime("%Y-%m-%d")
+            safe_title = self._sanitize_filename(infer_title)
+            filepath = note_dir / f"{date_str}-{safe_title}.md"
+            if filepath.exists():
+                filepath = note_dir / f"{date_str}-{safe_title}-{datetime.now().strftime('%H%M%S')}.md"
+            note = (
+                f"---\ntitle: {infer_title}\nsource: {source_url}\nplatform: {source_type}\n"
+                f"topic: {topic}\ncreated: {datetime.now().isoformat()}\n---\n\n"
+                f"## 摘要\n\n{summary}\n\n## 正文\n\n{content}\n"
+            )
+            filepath.write_text(note, encoding="utf-8")
+            logger.info(f"[Obsidian] Ingested {source_type}: {filepath}")
+            return True
+        except Exception as e:
+            logger.error(f"[Obsidian] ingest_content failed: {e}")
+            return False
+
     async def save_note(self, task: Task) -> bool:
         """
         将任务内容保存为 Obsidian Markdown 笔记
