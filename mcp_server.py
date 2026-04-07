@@ -17,6 +17,7 @@ from processors.transcriber import transcriber
 from processors.content_processor import content_processor
 from bot.content_analysis import ContentAnalyzer
 from bot.conversation_engine import ConversationEngine
+from storage.obsidian import obsidian_storage
 
 logging.basicConfig(
     level=logging.INFO,
@@ -226,6 +227,42 @@ async def analyze_content(task_id: int, type: str = "summary") -> str:
         return f"分析失败: {str(e)}"
 
 
+@mcp.tool()
+async def wiki_query(question: str) -> str:
+    """从个人知识库中检索相关笔记，综合回答问题。问答结束后自动将新知识写回知识库。
+    question: 你想了解的问题，例如"我学过哪些关于投资的内容？"
+    前提：需配置 OBSIDIAN_VAULT_PATH 环境变量。"""
+    logger.info(f"wiki_query: {question}")
+    try:
+        return await obsidian_storage.query_vault(question)
+    except Exception as e:
+        logger.error(f"wiki_query failed: {e}", exc_info=True)
+        return f"查询失败: {str(e)}"
+
+
+@mcp.tool()
+async def wiki_ingest(content: str, source_type: str, title: str = "", source_url: str = "") -> str:
+    """将网页文章或个人笔记写入知识库。
+    content: 文章或笔记的正文内容。
+    source_type: 'article'（网页文章）或 'note'（个人笔记）。
+    title: 标题（可选）。source_url: 来源链接（可选）。
+    前提：需配置 OBSIDIAN_VAULT_PATH 环境变量。"""
+    logger.info(f"wiki_ingest: source_type={source_type}, title={title}")
+    try:
+        success = await obsidian_storage.ingest_content(content, source_type, source_url, title)
+        return "✅ 已写入知识库" if success else "❌ 写入失败，请检查 OBSIDIAN_VAULT_PATH 配置"
+    except Exception as e:
+        logger.error(f"wiki_ingest failed: {e}", exc_info=True)
+        return f"写入失败: {str(e)}"
+
+
 if __name__ == "__main__":
-    logger.info("Starting PKOS MCP server on port 9000 (streamable-http)...")
-    mcp.run(transport="streamable-http")
+    import sys
+    # 默认使用 stdio transport（mcporter 兼容）
+    transport = "stdio" if len(sys.argv) == 1 else sys.argv[1]
+    if transport == "stdio":
+        logger.info("Starting PKOS MCP server (stdio transport)...")
+        mcp.run(transport="stdio")
+    else:
+        logger.info("Starting PKOS MCP server on port 9000 (streamable-http)...")
+        mcp.run(transport="streamable-http")
