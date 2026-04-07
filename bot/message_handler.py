@@ -9,6 +9,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from bot.session_manager import get_session_manager
 from bot.telegram_client import get_telegram_client
+from bot.progress_reporter import ProgressReporter
 from processors.video_downloader import video_downloader
 from processors.transcriber import transcriber
 from processors.content_processor import content_processor
@@ -131,40 +132,44 @@ class MessageHandler:
         流程: 下载 -> 转录 -> 内容处理
         """
         client = get_telegram_client()
+        loop = asyncio.get_event_loop()
 
         try:
             await storage.connect()
 
-            # 1. 下载视频
-            await client.send_progress_message(chat_id, "downloading", "正在下载视频...")
-            audio_path, title = await video_downloader.download(video_url)
+            # 发初始进度消息，拿回 message_id 用于后续编辑
+            msg = await client.send_progress_message(chat_id, "downloading", "准备下载...")
+            reporter = ProgressReporter(client, chat_id, msg.message_id, loop)
+
+            # 1. 下载视频（blocking → executor，进度通过 sync_update 回调）
+            audio_path, title = await video_downloader.download(video_url, reporter.sync_update)
             logger.info(f"Downloaded video: {title}")
 
-            # 2. 转录音频
-            await client.send_progress_message(chat_id, "transcribing", "正在转录音频...")
-            raw_content = transcriber.transcribe(audio_path)
+            # 2. 转录音频（blocking → executor，进度通过 sync_update 回调）
+            await reporter.async_update("transcribing", "开始转录音频...")
+            raw_content = await loop.run_in_executor(
+                None,
+                lambda: transcriber.transcribe(audio_path, reporter.sync_update)
+            )
             logger.info(f"Transcribed audio for task {task_id}")
 
-            # 3. 内容处理(优化文本)
-            await client.send_progress_message(chat_id, "processing", "正在优化内容...")
-            processed_content = await content_processor.process(raw_content, title)
+            # 3. 内容处理（async，进度通过 async_update 回调）
+            processed_content = await content_processor.process(
+                raw_content, title, reporter.async_update
+            )
             logger.info(f"Processed content for task {task_id}")
 
             # 4. 更新任务状态
-            # 同时保存原始转录(raw_transcript)和优化后内容(content)
-            # raw_transcript: 完整的原始转录，不受LLM token限制影响
-            # content: LLM优化后的内容，用于对话和展示
             await storage.update_task(
                 task_id,
                 title=title,
                 status="completed",
-                raw_transcript=raw_content,  # 保存完整原始转录
-                content=processed_content     # 保存优化后内容
+                raw_transcript=raw_content,
+                content=processed_content
             )
 
-            # 5. 发送完成通知
-            await client.send_progress_message(
-                chat_id,
+            # 5. 编辑同一条消息为最终完成状态
+            await reporter.async_update(
                 "completed",
                 f"✅ 处理完成!\n\n"
                 f"**标题:** {title}\n"
@@ -178,7 +183,6 @@ class MessageHandler:
         except Exception as e:
             logger.error(f"Failed to process video {task_id}: {e}")
 
-            # 更新任务为失败状态
             await storage.update_task(task_id, status="failed", error_message=str(e))
 
             await client.send_progress_message(

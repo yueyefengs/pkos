@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Optional, Callable
 from processors.llm_client import llm_client
 
 class ContentProcessor:
@@ -13,26 +14,29 @@ class ContentProcessor:
                 return f.read()
         return ""
 
-    async def process(self, content: str, title: str) -> str:
+    async def process(self, content: str, title: str, progress_callback: Optional[Callable] = None) -> str:
         """处理内容：优化、格式化
 
         Args:
             content: 原始转录内容
             title: 视频标题
+            progress_callback: 可选异步进度回调 async (stage, text) -> None
 
         Returns:
             处理后的内容
         """
-        # 首先分类内容
+        if progress_callback:
+            await progress_callback("processing", "正在分类内容类型...")
+
         content_type = await llm_client.classify_content(content)
 
-        # 加载对应的prompt
         prompt = self.load_prompt(content_type)
 
-        # 使用LLM优化内容
+        if progress_callback:
+            await progress_callback("processing", "正在优化内容（可能需要几分钟）...")
+
         optimized_content = await llm_client.optimize_content(content, prompt)
 
-        # 格式化输出
         formatted_content = f"# {title}\n\n{optimized_content}"
 
         return formatted_content

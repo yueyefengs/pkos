@@ -2,8 +2,9 @@
 Telegram Bot API客户端封装
 提供消息发送、长文本分割等基础功能
 """
-from telegram import Bot
+from telegram import Bot, Message
 from telegram.constants import ParseMode
+from telegram.error import BadRequest, TelegramError
 from telegram.request import HTTPXRequest
 from typing import Optional
 import os
@@ -43,19 +44,20 @@ class TelegramClient:
         text: str,
         parse_mode: str = ParseMode.MARKDOWN,
         disable_web_page_preview: bool = True
-    ) -> None:
-        """发送消息"""
+    ) -> Message:
+        """发送消息，返回 Message 对象（含 message_id）"""
         if not self.bot:
             raise RuntimeError("Bot not initialized. Call initialize() first.")
 
         try:
-            await self.bot.send_message(
+            msg = await self.bot.send_message(
                 chat_id=chat_id,
                 text=text,
                 parse_mode=parse_mode,
                 disable_web_page_preview=disable_web_page_preview
             )
             logger.debug(f"Message sent to {chat_id}")
+            return msg
         except Exception as e:
             logger.error(f"Failed to send message to {chat_id}: {e}")
             raise
@@ -111,9 +113,9 @@ class TelegramClient:
         chat_id: str,
         stage: str,
         message: str
-    ) -> None:
+    ) -> Message:
         """
-        发送处理进度消息
+        发送处理进度消息，返回 Message 对象供后续编辑
 
         Args:
             chat_id: 聊天ID
@@ -129,11 +131,53 @@ class TelegramClient:
         }
 
         emoji = emoji_map.get(stage, "ℹ️")
-        # 转义 Markdown 特殊字符，避免解析错误
         escaped_message = self._escape_markdown(message)
         full_message = f"{emoji} **{stage.upper()}**\n{escaped_message}"
 
-        await self.send_message(chat_id, full_message)
+        return await self.send_message(chat_id, full_message)
+
+    async def edit_progress_message(
+        self,
+        chat_id: str,
+        message_id: int,
+        stage: str,
+        text: str
+    ) -> None:
+        """
+        编辑已有进度消息（用于实时进度更新）
+        失败时静默忽略，不影响主流程
+
+        Args:
+            chat_id: 聊天ID
+            message_id: 要编辑的消息 ID
+            stage: 处理阶段
+            text: 新的进度文本
+        """
+        emoji_map = {
+            "downloading": "⬇️",
+            "transcribing": "🎤",
+            "processing": "🤖",
+            "completed": "✅",
+            "failed": "❌"
+        }
+        emoji = emoji_map.get(stage, "ℹ️")
+        escaped = self._escape_markdown(text)
+        full_message = f"{emoji} **{stage.upper()}**\n{escaped}"
+
+        try:
+            await self.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=full_message,
+                parse_mode=ParseMode.MARKDOWN,
+                disable_web_page_preview=True,
+            )
+        except BadRequest as e:
+            # 消息内容未变化 or 消息已被删除，静默忽略
+            if "message is not modified" not in str(e).lower():
+                logger.debug(f"edit_progress_message BadRequest: {e}")
+        except TelegramError as e:
+            logger.debug(f"edit_progress_message failed: {e}")
 
     def _escape_markdown(self, text: str) -> str:
         """

@@ -1,6 +1,6 @@
 import re
 import asyncio
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Callable
 from pathlib import Path
 from config.settings import settings
 
@@ -17,8 +17,12 @@ class VideoDownloader:
             return "bilibili"
         return None
 
-    async def download(self, url: str) -> Tuple[str, str]:
+    async def download(self, url: str, progress_callback: Optional[Callable] = None) -> Tuple[str, str]:
         """下载视频并提取音频
+
+        Args:
+            url: 视频链接
+            progress_callback: 可选进度回调 (stage, text) -> None
 
         Returns:
             (音频文件路径, 视频标题)
@@ -26,14 +30,21 @@ class VideoDownloader:
         platform = self.detect_platform(url)
 
         if platform == "bilibili":
-            return await self._download_bilibili(url)
+            return await self._download_bilibili(url, progress_callback)
         elif platform == "douyin":
-            return await self._download_douyin(url)
+            return await self._download_douyin(url, progress_callback)
         else:
             raise ValueError(f"不支持的平台: {platform}")
 
-    async def _download_bilibili(self, url: str) -> Tuple[str, str]:
-        """下载B站视频"""
+    async def _download_bilibili(self, url: str, progress_callback: Optional[Callable] = None) -> Tuple[str, str]:
+        """下载B站视频（在线程池中运行，不阻塞 event loop）"""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None, self._download_bilibili_sync, url, progress_callback
+        )
+
+    def _download_bilibili_sync(self, url: str, progress_callback: Optional[Callable] = None) -> Tuple[str, str]:
+        """B站下载同步实现，供 run_in_executor 调用"""
         import yt_dlp
 
         output_template = str(self.temp_dir / "bilibili_%(title)s.%(ext)s")
@@ -52,6 +63,18 @@ class VideoDownloader:
             'noplaylist': True,
         }
 
+        if progress_callback:
+            def hook(d: dict):
+                if d.get('status') == 'downloading':
+                    pct = d.get('_percent_str', '').strip()  # e.g. " 45.2%"
+                    downloaded = d.get('_downloaded_bytes_str', '')
+                    total = d.get('_total_bytes_str', '') or d.get('_total_bytes_estimate_str', '')
+                    detail = f"{pct}" if pct else "下载中..."
+                    if downloaded and total:
+                        detail = f"{pct} ({downloaded} / {total})"
+                    progress_callback("downloading", f"正在下载... {detail}")
+            ydl_opts['progress_hooks'] = [hook]
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             title = info.get('title', 'unknown')
@@ -64,11 +87,13 @@ class VideoDownloader:
 
         raise Exception("未找到下载的音频文件")
 
-    async def _download_douyin(self, url: str) -> Tuple[str, str]:
+    async def _download_douyin(self, url: str, progress_callback: Optional[Callable] = None) -> Tuple[str, str]:
         """下载抖音视频 - 使用专业爬虫"""
         from processors.douyin_crawler_downloader import get_douyin_crawler_downloader
 
-        # 使用Douyin_TikTok_Download_API的专业爬虫
+        if progress_callback:
+            progress_callback("downloading", "正在下载抖音视频...")
+
         downloader = get_douyin_crawler_downloader(cookies_file=settings.douyin_cookies_file)
         return await downloader.download(url)
 

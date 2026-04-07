@@ -1,6 +1,13 @@
-from typing import Optional
+from typing import Optional, Callable
 from faster_whisper import WhisperModel
 from pathlib import Path
+
+
+def _fmt_time(seconds: float) -> str:
+    """将秒数格式化为 m:ss"""
+    m, s = divmod(int(seconds), 60)
+    return f"{m}:{s:02d}"
+
 
 class Transcriber:
     def __init__(self, model_size: str = "base", device: str = "cpu"):
@@ -19,11 +26,12 @@ class Transcriber:
                 compute_type=compute_type
             )
 
-    def transcribe(self, audio_path: str) -> str:
+    def transcribe(self, audio_path: str, progress_callback: Optional[Callable] = None) -> str:
         """转录音频文件
 
         Args:
             audio_path: 音频文件路径
+            progress_callback: 可选进度回调 (stage, text) -> None，每 5% 调用一次
 
         Returns:
             转录文本
@@ -50,13 +58,28 @@ class Transcriber:
         )
 
         self.detected_language = info.language
+        total = info.duration or 1.0  # 防止除零
 
-        # 收集文本
+        # 收集文本，同时上报进度
         text_only_lines = []
+        last_reported_pct = -1
+
         for segment in segments:
             text = segment.text.strip()
             if text:
                 text_only_lines.append(text)
+
+            if progress_callback and total > 0:
+                pct = int(segment.end / total * 100)
+                # 每 5% 上报一次
+                if pct >= last_reported_pct + 5:
+                    elapsed = _fmt_time(segment.end)
+                    duration = _fmt_time(total)
+                    progress_callback(
+                        "transcribing",
+                        f"转录中... {pct}% ({elapsed} / {duration})"
+                    )
+                    last_reported_pct = pct
 
         # 合并段落
         plain_text = "\n\n".join(text_only_lines)
