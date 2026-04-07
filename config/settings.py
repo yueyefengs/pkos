@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # 抖音配置
     douyin_cookies_file: str = "douyin_cookies.txt"
 
+    # Obsidian 知识库配置
+    obsidian_vault_path: Optional[str] = None
+
     # ============================================
     # LLM 多模型配置
     # ============================================

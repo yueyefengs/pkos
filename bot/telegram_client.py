@@ -29,7 +29,9 @@ class TelegramClient:
                 proxy=proxy_url,
                 connect_timeout=30.0,
                 read_timeout=30.0,
-                write_timeout=30.0
+                write_timeout=30.0,
+                connection_pool_size=8,  # 支持并发视频任务同时发送消息
+                pool_timeout=15.0,       # 默认 1s 太短，长任务并发时容易耗尽
             )
             self.bot = Bot(token=settings.telegram_bot_token, request=request)
         else:

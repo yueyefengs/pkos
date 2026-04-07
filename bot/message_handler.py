@@ -14,6 +14,7 @@ from processors.video_downloader import video_downloader
 from processors.transcriber import transcriber
 from processors.content_processor import content_processor
 from storage.postgres import storage
+from storage.obsidian import obsidian_storage
 from models.task import TaskCreate
 from config.logger import logger
 
@@ -85,7 +86,7 @@ class MessageHandler:
             await client.send_message(
                 chat_id,
                 "❌ 不支持的视频平台\n"
-                "目前仅支持: 抖音、B站"
+                "目前仅支持: 抖音、B站、YouTube"
             )
             return
 
@@ -167,6 +168,11 @@ class MessageHandler:
                 raw_transcript=raw_content,
                 content=processed_content
             )
+
+            # 4b. 保存到 Obsidian（best-effort，不影响主流程）
+            completed_task = await storage.get_task(task_id)
+            if completed_task:
+                asyncio.create_task(obsidian_storage.save_note(completed_task))
 
             # 5. 编辑同一条消息为最终完成状态
             await reporter.async_update(

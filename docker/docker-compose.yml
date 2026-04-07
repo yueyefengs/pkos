@@ -38,7 +38,7 @@ services:
   pkos-mcp:
     image: ${IMAGE_NAME:-yueyefeng11/pkos:latest}
     container_name: pkos-mcp
-    command: python3 mcp_server.py
+    command: python3 mcp_server.py http
     ports:
       - "9000:9000"
     env_file:

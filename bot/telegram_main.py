@@ -102,14 +102,19 @@ def main():
             proxy=proxy_url,
             connect_timeout=30.0,
             read_timeout=30.0,
-            write_timeout=30.0
+            write_timeout=30.0,
+            connection_pool_size=8,  # 支持并发视频任务同时发送消息
+            pool_timeout=15.0,       # 默认 1s 太短，长任务并发时容易耗尽
         )
         # get_updates 用于轮询，也需要配置代理
+        # read_timeout = polling timeout(5s) + 20s 余量，避免代理 idle timeout 竞争
         get_updates_request = HTTPXRequest(
             proxy=proxy_url,
             connect_timeout=30.0,
-            read_timeout=30.0,
-            write_timeout=30.0
+            read_timeout=25.0,
+            write_timeout=30.0,
+            connection_pool_size=2,  # polling 通常只需 1 个连接，留 1 个余量
+            pool_timeout=15.0,
         )
         builder = builder.request(request).get_updates_request(get_updates_request)
     else:
@@ -157,10 +162,13 @@ def main():
     logger.info("All handlers registered")
 
     # 启动Long Polling
+    # timeout=5: 每次 getUpdates 最多等 5 秒，减少代理因 idle timeout 断连的概率
+    # read_timeout 在 get_updates_request 中设为 timeout + 20s 的余量
     logger.info(f"Starting bot polling... (Bot: {settings.telegram_bot_username})")
     application.run_polling(
         allowed_updates=["message"],
-        drop_pending_updates=True
+        drop_pending_updates=True,
+        timeout=5,
     )
 
 

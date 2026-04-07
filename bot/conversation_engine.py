@@ -5,7 +5,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 from bot.session_manager import get_session_manager
-from bot.telegram_client import get_telegram_client
+from bot.telegram_client import get_telegram_client, escape_markdown_v2
 from storage.postgres import storage
 from processors.llm_client import llm_client
 from config.logger import logger
@@ -206,8 +206,12 @@ class ConversationEngine:
 
             await session.disconnect()
 
-            # 6. 发送回复
-            await client.send_long_message(chat_id, response)
+            # 6. 发送回复（优先使用 Markdown，失败则回退纯文本）
+            try:
+                await client.send_long_message(chat_id, response)
+            except Exception as markdown_err:
+                logger.warning(f"Markdown send failed, falling back to plain text: {markdown_err}")
+                await client.send_long_message(chat_id, response, parse_mode=None)
 
             logger.info(f"Conversation handled for user {user_id} in {mode} mode")
 
@@ -215,5 +219,5 @@ class ConversationEngine:
             logger.error(f"Failed to handle conversation: {e}")
             await client.send_message(
                 chat_id,
-                f"❌ 对话处理失败: {str(e)}"
+                f"❌ 对话处理失败: {escape_markdown_v2(str(e))}"
             )
