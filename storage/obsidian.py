@@ -158,6 +158,57 @@ class ObsidianStorage:
             logger.error(f"[Obsidian] Failed to synthesize answer: {e}")
             return "回答生成失败，请稍后重试。"
 
+    async def _writeback_knowledge(self, question: str, answer: str, source_paths: list[str]) -> None:
+        """从问答中提取新知识，异步写回 vault（只追加，不覆盖）"""
+        existing_titles = [Path(p).stem for p in source_paths]
+        prompt = (
+            f"以下是一段知识库问答记录。请判断问答中是否包含以下三类新知识：\n"
+            f"1. 新概念：问答中出现但知识库里没有的知识点\n"
+            f"2. 关联补充：揭示了两个已有概念之间的新关系\n"
+            f"3. 用户观点：用户提问时带出的个人理解或经验\n\n"
+            f"用户问题：{question}\n\n回答：{answer}\n\n"
+            f"现有笔记标题（参考，避免重复）：{', '.join(existing_titles)}\n\n"
+            f"如果有新知识，以如下格式输出（每条新知识一个块）：\n"
+            f"---\n目标文件标题: 应追加到哪个现有笔记的标题（若无合适笔记则填'新建'）\n"
+            f"主题: 所属主题分类\n内容: 要写入的内容\n---\n\n"
+            f"如果没有新知识，只输出：无"
+        )
+        try:
+            result = (await llm_client.generate_chat_response(prompt)).strip()
+            if result == "无":
+                return
+            date_str = datetime.now().strftime("%Y-%m-%d")
+            blocks = [b.strip() for b in result.split("---") if b.strip()]
+            for block in blocks:
+                lines = {}
+                for line in block.splitlines():
+                    if ":" in line:
+                        k, _, v = line.partition(":")
+                        lines[k.strip()] = v.strip()
+                target_title = lines.get("目标文件标题", "")
+                topic = lines.get("主题", "其他")
+                content = lines.get("内容", "")
+                if not content:
+                    continue
+                if target_title and target_title != "新建":
+                    matches = list(self.vault_path.rglob(f"*{target_title}*.md"))
+                    if matches:
+                        with matches[0].open("a", encoding="utf-8") as f:
+                            f.write(f"\n\n## 补充 ({date_str})\n\n来源：wiki_query 问答\n问题：{question}\n\n{content}\n")
+                        logger.info(f"[Obsidian] Writeback appended to {matches[0]}")
+                        continue
+                topic_dir = self.vault_path / (topic if topic in TOPIC_CATEGORIES else "其他")
+                topic_dir.mkdir(parents=True, exist_ok=True)
+                safe_q = self._sanitize_filename(question)
+                filepath = topic_dir / f"{date_str}-问答补充-{safe_q}.md"
+                filepath.write_text(
+                    f"---\ntitle: 问答补充：{question[:50]}\ntopic: {topic}\ncreated: {datetime.now().isoformat()}\n---\n\n## 内容\n\n{content}\n",
+                    encoding="utf-8"
+                )
+                logger.info(f"[Obsidian] Writeback created {filepath}")
+        except Exception as e:
+            logger.error(f"[Obsidian] Writeback failed: {e}")
+
     async def save_note(self, task: Task) -> bool:
         """
         将任务内容保存为 Obsidian Markdown 笔记

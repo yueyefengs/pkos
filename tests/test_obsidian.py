@@ -52,3 +52,28 @@ async def test_select_relevant_notes_returns_empty_on_no_match(vault):
         mock_llm.generate_chat_response = AsyncMock(return_value="无")
         result = await vault._select_relevant_notes("量子物理", notes)
     assert result == []
+
+
+@pytest.mark.asyncio
+async def test_writeback_does_nothing_when_no_new_knowledge(vault):
+    with patch('storage.obsidian.llm_client') as mock_llm:
+        mock_llm.generate_chat_response = AsyncMock(return_value="无")
+        await vault._writeback_knowledge("问题", "回答", [])
+    # 没有文件被创建
+    assert list(vault.vault_path.rglob("*.md")) == []
+
+
+@pytest.mark.asyncio
+async def test_writeback_appends_to_existing_file(vault, tmp_path):
+    (tmp_path / "心理学").mkdir()
+    note_path = tmp_path / "心理学" / "2026-01-01-认知偏见.md"
+    note_path.write_text("---\ntitle: 认知偏见\n---\n\n## 摘要\n\n摘要\n", encoding="utf-8")
+
+    llm_response = "---\n目标文件标题: 认知偏见\n主题: 心理学\n内容: 新补充的知识\n---"
+    with patch('storage.obsidian.llm_client') as mock_llm:
+        mock_llm.generate_chat_response = AsyncMock(return_value=llm_response)
+        await vault._writeback_knowledge("问题", "回答", [str(note_path)])
+
+    content = note_path.read_text(encoding="utf-8")
+    assert "## 补充" in content
+    assert "新补充的知识" in content
