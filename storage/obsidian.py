@@ -115,6 +115,49 @@ class ObsidianStorage:
                 logger.warning(f"[Obsidian] Failed to read {md_file}: {e}")
         return notes
 
+    async def _select_relevant_notes(self, question: str, notes: list[dict]) -> list[str]:
+        """LLM 从摘要列表中选出与问题相关的文件路径（最多3个）"""
+        notes_text = "\n\n".join(
+            f"[{i}] 路径: {n['path']}\n标题: {n['title']}\n主题: {n['topic']}\n摘要: {n['summary']}"
+            for i, n in enumerate(notes)
+        )
+        prompt = (
+            f"用户问题：{question}\n\n"
+            f"以下是知识库中的笔记摘要列表：\n\n{notes_text}\n\n"
+            f"请选出最相关的笔记编号（最多3个），只回答编号，用逗号分隔。如果没有相关笔记，回答'无'。\n"
+            f"例如：0,2"
+        )
+        try:
+            result = (await llm_client.generate_chat_response(prompt)).strip()
+            if result == "无":
+                return []
+            indices = [int(x.strip()) for x in result.split(",") if x.strip().isdigit()]
+            return [notes[i]["path"] for i in indices if i < len(notes)]
+        except Exception as e:
+            logger.error(f"[Obsidian] Failed to select relevant notes: {e}")
+            return []
+
+    async def _synthesize_answer(self, question: str, paths: list[str], texts: list[str]) -> str:
+        """LLM 基于相关文件全文综合回答，附引用来源"""
+        sources_text = "\n\n---\n\n".join(
+            f"来源：{Path(p).name}\n\n{t[:5000]}"
+            for p, t in zip(paths, texts)
+        )
+        prompt = (
+            f"请基于以下知识库笔记回答用户的问题。\n\n"
+            f"用户问题：{question}\n\n"
+            f"知识库内容：\n{sources_text}\n\n"
+            f"要求：\n"
+            f"1. 基于笔记内容直接回答，不添加笔记中没有的事实\n"
+            f"2. 在回答末尾注明引用来源（文件名）\n"
+            f"3. 如果笔记内容不足以回答，诚实说明"
+        )
+        try:
+            return await llm_client.generate_chat_response(prompt)
+        except Exception as e:
+            logger.error(f"[Obsidian] Failed to synthesize answer: {e}")
+            return "回答生成失败，请稍后重试。"
+
     async def save_note(self, task: Task) -> bool:
         """
         将任务内容保存为 Obsidian Markdown 笔记
