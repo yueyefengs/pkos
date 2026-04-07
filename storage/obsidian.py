@@ -209,6 +209,21 @@ class ObsidianStorage:
         except Exception as e:
             logger.error(f"[Obsidian] Writeback failed: {e}")
 
+    async def query_vault(self, question: str) -> str:
+        """两阶段检索回答问题，问答后异步写回新知识"""
+        if not self._is_enabled():
+            return "Obsidian vault 未配置，请设置 OBSIDIAN_VAULT_PATH 环境变量。"
+        notes = self._load_note_summaries()
+        if not notes:
+            return "知识库为空，请先处理一些视频。"
+        relevant_paths = await self._select_relevant_notes(question, notes)
+        if not relevant_paths:
+            return "知识库中没有找到与问题相关的笔记。"
+        full_texts = [Path(p).read_text(encoding="utf-8") for p in relevant_paths]
+        answer = await self._synthesize_answer(question, relevant_paths, full_texts)
+        asyncio.create_task(self._writeback_knowledge(question, answer, relevant_paths))
+        return answer
+
     async def save_note(self, task: Task) -> bool:
         """
         将任务内容保存为 Obsidian Markdown 笔记

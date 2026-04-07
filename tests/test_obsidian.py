@@ -77,3 +77,17 @@ async def test_writeback_appends_to_existing_file(vault, tmp_path):
     content = note_path.read_text(encoding="utf-8")
     assert "## 补充" in content
     assert "新补充的知识" in content
+
+
+@pytest.mark.asyncio
+async def test_query_vault_disabled_when_no_vault():
+    storage = ObsidianStorage.__new__(ObsidianStorage)
+    storage.vault_path = None
+    result = await storage.query_vault("任何问题")
+    assert "未配置" in result
+
+
+@pytest.mark.asyncio
+async def test_query_vault_empty_vault(vault):
+    result = await vault.query_vault("任何问题")
+    assert "为空" in result
