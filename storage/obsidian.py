@@ -99,6 +99,7 @@ class ObsidianStorage:
                 text = md_file.read_text(encoding="utf-8")
                 title = md_file.stem
                 topic = md_file.parent.name
+                created = ""
                 fm_match = re.search(r"^---\n(.*?)\n---", text, re.DOTALL)
                 if fm_match:
                     for line in fm_match.group(1).splitlines():
@@ -106,19 +107,23 @@ class ObsidianStorage:
                             title = line[6:].strip()
                         elif line.startswith("topic:"):
                             topic = line[6:].strip()
+                        elif line.startswith("created:"):
+                            created = line[8:].strip()
                 summary = ""
                 summary_match = re.search(r"## 摘要\n\n(.*?)(?=\n## |\Z)", text, re.DOTALL)
                 if summary_match:
                     summary = summary_match.group(1).strip()[:500]
-                notes.append({"path": str(md_file), "title": title, "topic": topic, "summary": summary})
+                notes.append({"path": str(md_file), "title": title, "topic": topic, "summary": summary, "created": created})
             except Exception as e:
                 logger.warning(f"[Obsidian] Failed to read {md_file}: {e}")
         return notes
 
     async def _select_relevant_notes(self, question: str, notes: list[dict]) -> list[str]:
         """LLM 从摘要列表中选出与问题相关的文件路径（最多3个）"""
+        # 按创建时间倒序，让最新文章排在前面
+        notes = sorted(notes, key=lambda n: n.get("created", ""), reverse=True)
         notes_text = "\n\n".join(
-            f"[{i}] 路径: {n['path']}\n标题: {n['title']}\n主题: {n['topic']}\n摘要: {n['summary']}"
+            f"[{i}] 路径: {n['path']}\n标题: {n['title']}\n主题: {n['topic']}\n创建时间: {n.get('created', '未知')}\n摘要: {n['summary']}"
             for i, n in enumerate(notes)
         )
         prompt = (
@@ -221,7 +226,10 @@ class ObsidianStorage:
             return "知识库中没有找到与问题相关的笔记。"
         full_texts = [Path(p).read_text(encoding="utf-8") for p in relevant_paths]
         answer = await self._synthesize_answer(question, relevant_paths, full_texts)
-        asyncio.create_task(self._writeback_knowledge(question, answer, relevant_paths))
+        wb_task = asyncio.create_task(self._writeback_knowledge(question, answer, relevant_paths))
+        wb_task.add_done_callback(
+            lambda t: logger.error(f"[Obsidian] writeback failed: {t.exception()}") if not t.cancelled() and t.exception() else None
+        )
         return answer
 
     async def ingest_content(self, content: str, source_type: str, source_url: str = "", title: str = "") -> bool:

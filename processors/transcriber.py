@@ -2,6 +2,9 @@ from typing import Optional, Callable
 from faster_whisper import WhisperModel
 from pathlib import Path
 
+# 本地模型目录（通过 docker-compose volume 挂载，不依赖 HF Hub）
+_LOCAL_MODEL_DIR = Path(__file__).parent.parent / "models" / "whisper-base"
+
 
 def _fmt_time(seconds: float) -> str:
     """将秒数格式化为 m:ss"""
@@ -17,11 +20,13 @@ class Transcriber:
         self.detected_language: Optional[str] = None
 
     def _load_model(self):
-        """延迟加载模型"""
+        """延迟加载模型，优先使用本地目录"""
         if self.model is None:
             compute_type = "float16" if self.device == "cuda" else "int8"
+            # 本地目录存在时直接加载，否则回退到按名称下载
+            model_path = str(_LOCAL_MODEL_DIR) if _LOCAL_MODEL_DIR.exists() else self.model_size
             self.model = WhisperModel(
-                self.model_size,
+                model_path,
                 device=self.device,
                 compute_type=compute_type
             )

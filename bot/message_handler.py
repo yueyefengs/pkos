@@ -172,7 +172,10 @@ class MessageHandler:
             # 4b. 保存到 Obsidian（best-effort，不影响主流程）
             completed_task = await storage.get_task(task_id)
             if completed_task:
-                asyncio.create_task(obsidian_storage.save_note(completed_task))
+                task_bg = asyncio.create_task(obsidian_storage.save_note(completed_task))
+                task_bg.add_done_callback(
+                    lambda t: logger.error(f"[Obsidian] save_note failed: {t.exception()}") if not t.cancelled() and t.exception() else None
+                )
 
             # 5. 编辑同一条消息为最终完成状态
             await reporter.async_update(

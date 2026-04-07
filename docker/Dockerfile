@@ -15,11 +15,17 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# 复制本地预下载的 Whisper 模型（避免构建时联网）
+COPY models/whisper-base /root/.cache/huggingface/hub/models--Systran--faster-whisper-base/snapshots/local/
+
 # 复制应用代码
 COPY . .
 
 # 创建必要目录
 RUN mkdir -p temp storage log
+
+# 运行时不联网，使用镜像内缓存的模型
+ENV HF_HUB_OFFLINE=1
 
 # 暴露端口
 EXPOSE 8080
