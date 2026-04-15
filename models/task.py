@@ -5,6 +5,7 @@ from typing import Optional
 
 class TaskStatus(str, Enum):
     PROCESSING = "processing"
+    DIGESTING = "digesting"
     COMPLETED = "completed"
     FAILED = "failed"
 
@@ -21,6 +22,7 @@ class Task(BaseModel):
     error_message: Optional[str] = Field(None, description="Error message if failed")
     content: Optional[str] = Field(None, description="Processed content (optimized by LLM)")
     raw_transcript: Optional[str] = Field(None, description="Raw transcription from audio (complete, unprocessed)")
+    wiki_paths: Optional[str] = Field(None, description="JSON array of wiki note paths")
 
 class TaskCreate(BaseModel):
     task_id: str
@@ -33,6 +35,7 @@ class TaskUpdate(BaseModel):
     error_message: Optional[str] = None
     content: Optional[str] = None
     raw_transcript: Optional[str] = None
+    wiki_paths: Optional[str] = None
     completed_at: Optional[datetime] = None
 
 # 学习进度相关模型
