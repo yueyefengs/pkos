@@ -25,13 +25,6 @@ services:
       - DB_PORT=5432
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      # 代理配置：Docker容器内访问宿主机代理
-      # macOS/Windows: 使用 host.docker.internal
-      # Linux: 使用宿主机IP或 --add-host=host.docker.internal:host-gateway
-      - HTTP_PROXY=http://host.docker.internal:7897
-      - HTTPS_PROXY=http://host.docker.internal:7897
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     volumes:
       - ./log:/app/log
 
@@ -53,10 +46,11 @@ services:
       - DB_PORT=5432
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - HTTP_PROXY=http://host.docker.internal:7897
-      - HTTPS_PROXY=http://host.docker.internal:7897
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - OBSIDIAN_VAULT_PATH=/Users/yueqingli/code/obsidian/pkos
+      - DOUYIN_COOKIES_FILE=/app/temp/douyin_cookies.txt
+    volumes:
+      - /Users/yueqingli/code/obsidian/pkos:/Users/yueqingli/code/obsidian/pkos
+      - ../douyin_cookies.txt:/app/temp/douyin_cookies.txt
 
   db:
     image: postgres:15-alpine

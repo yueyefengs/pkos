@@ -337,25 +337,36 @@ async def get_task(task_id: int) -> str:
 async def query(
     question: str,
     task_id: int = 0,
-    mode: str = "normal"
+    mode: str = "normal",
+    history: str = ""
 ) -> str:
     """
-    知识库查询。综合 wiki 和历史任务回答问题。
-    
+    知识库查询。综合 wiki 和历史任务回答问题。问答结束后自动将新知识异步回写到 wiki。
+
     参数：
     - question: 问题（必填）
     - task_id: 限定在某个任务范围内（可选，0 表示搜索全库）
     - mode: 回答模式
       - "normal": 直接回答
       - "learning": 苏格拉底式，通过提问引导思考，不直接给答案
-    
+    - history: 对话历史（JSON 字符串，格式 [{"role":"user","content":"..."},...]，可选）
+
     返回：回答内容
     """
     logger.info(f"query: task_id={task_id}, mode={mode}")
-    
+
     try:
         content = ""
-        
+        relevant_paths: list[str] = []
+
+        # 解析对话历史
+        history_list: list[dict] = []
+        if history:
+            try:
+                history_list = json.loads(history)
+            except Exception:
+                logger.warning("query: failed to parse history JSON, ignoring")
+
         # 指定任务范围
         if task_id > 0:
             try:
@@ -363,48 +374,58 @@ async def query(
                 task = await db.get_task_by_id(task_id)
             finally:
                 await db.disconnect()
-            
+
             if not task:
                 return f"未找到 task_id={task_id} 的任务。"
-            
+
             if not task.content:
                 return f"任务 {task_id} 没有可用内容。"
-            
+
             content = task.content
             source = f"任务 {task_id}：{task.title}"
-        
+
         # 全库搜索
         else:
-            # 读取 wiki 内容
             vault_path = Path(settings.obsidian_vault_path) if settings.obsidian_vault_path else None
             if not vault_path:
                 return "知识库未配置 OBSIDIAN_VAULT_PATH"
-            
+
             wiki_dir = vault_path / "wiki"
             if not wiki_dir.exists():
                 return "知识库为空，请先使用 ingest 摄入内容"
-            
+
             relevant_notes = _find_relevant_notes(question, wiki_dir)
             if not relevant_notes:
                 return f"知识库中没有找到与「{question}」相关的内容"
-            
-            # 合并相关内容
+
+            relevant_paths = [note["path"] for note in relevant_notes]
             content = "\n\n---\n\n".join(
                 f"### {note['title']}\n路径：{note['path']}\n\n{note['content']}"
                 for note in relevant_notes
             )
             source = f"知识库（{len(relevant_notes)} 条相关笔记）"
-        
+
         # 调用对话引擎
         response = await engine.generate_response(
             question=question,
             article_content=content,
             mode=mode,
-            history=[]
+            history=history_list
         )
-        
+
+        # 异步回写新知识（仅全库搜索模式，task_id 模式不触发回写）
+        if relevant_paths:
+            wb_task = asyncio.create_task(
+                unified_processor.writeback_from_qa(question, response, relevant_paths)
+            )
+            wb_task.add_done_callback(
+                lambda t: logger.error(f"[Query] writeback failed: {t.exception()}")
+                if not t.cancelled() and t.exception()
+                else None
+            )
+
         return f"**来源**：{source}\n\n{response}"
-        
+
     except Exception as e:
         logger.error(f"query failed: {e}", exc_info=True)
         return f"查询失败: {str(e)}"

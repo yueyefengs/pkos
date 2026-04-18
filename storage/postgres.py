@@ -56,6 +56,19 @@ class PostgresStorage:
         END $$;
         """
 
+        # 迁移：为现有表添加 wiki_paths 字段（如果不存在）
+        add_wiki_paths_column = """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'tasks' AND column_name = 'wiki_paths'
+            ) THEN
+                ALTER TABLE tasks ADD COLUMN wiki_paths TEXT;
+            END IF;
+        END $$;
+        """
+
         # 学习进度表
         create_learning_progress_table = """
         CREATE TABLE IF NOT EXISTS learning_progress (
@@ -98,7 +111,8 @@ class PostgresStorage:
 
         async with self.pool.acquire() as conn:
             await conn.execute(create_tasks_table)
-            await conn.execute(add_raw_transcript_column)  # 迁移：添加新字段
+            await conn.execute(add_raw_transcript_column)  # 迁移：添加 raw_transcript
+            await conn.execute(add_wiki_paths_column)  # 迁移：添加 wiki_paths
             await conn.execute(create_learning_progress_table)
             await conn.execute(create_concept_mastery_table)
             await conn.execute(create_learning_checkpoints_table)
@@ -151,7 +165,7 @@ class PostgresStorage:
         updates.append("updated_at = NOW()")
         values.append(task_id)
 
-        sql = f"UPDATE tasks SET {', '.join(updates)} WHERE task_id = ${param_idx}"
+        sql = f"UPDATE tasks SET {', '.join(updates)} WHERE task_id = ${param_idx} RETURNING *"
 
         async with self.pool.acquire() as conn:
             record = await conn.fetchrow(sql, *values)
@@ -171,7 +185,8 @@ class PostgresStorage:
             completed_at=record["completed_at"],
             error_message=record["error_message"],
             content=record["content"],
-            raw_transcript=record.get("raw_transcript")  # 使用 get 以兼容旧数据
+            raw_transcript=record.get("raw_transcript"),  # 使用 get 以兼容旧数据
+            wiki_paths=record.get("wiki_paths")  # 使用 get 以兼容旧数据
         )
 
     # ===== 学习进度相关方法 =====
@@ -314,14 +329,19 @@ class PostgresStorage:
             )
         return self._record_to_checkpoint(record)
 
-    async def get_recent_tasks(self, limit: int = 10) -> List[Task]:
-        """获取最近的任务列表"""
+    async def get_recent_tasks(self, limit: int = 10, offset: int = 0) -> List[Task]:
+        """获取最近的任务列表（支持分页）"""
         async with self.pool.acquire() as conn:
             records = await conn.fetch(
-                "SELECT * FROM tasks WHERE status = 'completed' ORDER BY completed_at DESC LIMIT $1",
-                limit
+                "SELECT * FROM tasks WHERE status = 'completed' ORDER BY completed_at DESC LIMIT $1 OFFSET $2",
+                limit, offset
             )
         return [self._record_to_task(r) for r in records]
+
+    async def get_total_tasks_count(self) -> int:
+        """获取已完成任务总数"""
+        async with self.pool.acquire() as conn:
+            return await conn.fetchval("SELECT COUNT(*) FROM tasks WHERE status = 'completed'")
 
     def _record_to_progress(self, record) -> LearningProgress:
         """将数据库记录转换为LearningProgress对象"""

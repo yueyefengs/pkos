@@ -6,45 +6,12 @@
 
 name: pkos
 services:
-  pkos:
-    container_name: pkos
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    command: python3 start_telegram_bot.py
-    volumes:
-      - ..:/app
-      - /app/__pycache__
-      - /app/.pytest_cache
-      - ../log:/app/log
-    environment:
-      - PYTHONUNBUFFERED=1
-      - DB_HOST=db
-      - DB_PORT=5432
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      # 代理配置：Docker容器内访问宿主机代理
-      # macOS/Windows: 使用 host.docker.internal
-      # Linux: 使用宿主机IP或 --add-host=host.docker.internal:host-gateway
-      - HTTP_PROXY=http://host.docker.internal:7897
-      - HTTPS_PROXY=http://host.docker.internal:7897
-    env_file:
-      - ../.env
-    ports:
-      - "8080:8080"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    depends_on:
-      - db
-      - redis
-    restart: unless-stopped
-
   pkos-mcp:
     container_name: pkos-mcp
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    command: python3 mcp_server.py
+    command: python3 mcp_server.py http
     volumes:
       - ..:/app
       - /app/__pycache__
@@ -54,14 +21,10 @@ services:
       - DB_PORT=5432
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - HTTP_PROXY=http://host.docker.internal:7897
-      - HTTPS_PROXY=http://host.docker.internal:7897
     env_file:
       - ../.env
     ports:
       - "9000:9000"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
       - db
       - redis

@@ -310,8 +310,10 @@ created: {datetime.now().isoformat()}
         # 提取正文
         body = re.sub(r"^---\n.*?\n---\n", "", raw_content, flags=re.DOTALL)
         
-        # 调用 LLM 消化
-        prompt = self._build_digest_prompt(str(raw_path.relative_to(self.vault_path)), title, body[:10000])
+        # 调用 LLM 消化（截断保护：超出 20000 字符时记录警告）
+        if len(body) > 20000:
+            logger.warning(f"[Unified] Content truncated from {len(body)} to 20000 chars for digest")
+        prompt = self._build_digest_prompt(str(raw_path.relative_to(self.vault_path)), title, body[:20000])
         
         try:
             result = await llm_client.generate_chat_response(prompt)
@@ -325,16 +327,22 @@ created: {datetime.now().isoformat()}
             raise ValueError("知识消化失败: 未生成有效 wiki 笔记")
         created_paths = []
         
+        date_str = datetime.now().strftime("%Y-%m-%d")
         for note in notes:
-            note_type = self._classify_note_type(note["title"], note["content"])
+            # 优先使用 LLM 声明的类型，回退到关键词分类
+            note_type = note.get("type") or self._classify_note_type(note["title"], note["content"])
             wiki_subdir = self.wiki_dir / note_type
             wiki_subdir.mkdir(parents=True, exist_ok=True)
-            
+
             safe_title = self._sanitize_filename(note["title"])
             filepath = wiki_subdir / f"{safe_title}.md"
-            
-            # 写入笔记
-            note_content = f"""---
+
+            if filepath.exists():
+                # 同名笔记已存在：追加补充段，避免覆盖
+                with filepath.open("a", encoding="utf-8") as f:
+                    f.write(f"\n\n## 补充 ({date_str})\n\n来源：{raw_path.name}\n\n{note['content']}\n")
+            else:
+                note_content = f"""---
 title: {note['title']}
 created: {datetime.now().isoformat()}
 source: {raw_path.name}
@@ -347,7 +355,8 @@ tags: {note.get('tags', '')}
 **来源**：[[{raw_path.stem}]]
 **相关条目**：{note.get('related', '无')}
 """
-            filepath.write_text(note_content, encoding="utf-8")
+                filepath.write_text(note_content, encoding="utf-8")
+
             created_paths.append(str(filepath))
         
         if not created_paths:
@@ -386,6 +395,8 @@ tags: {note.get('tags', '')}
 ---
 # [笔记标题]
 
+**类型**：概念/方法/观点/案例/人物/公司（六选一）
+
 [笔记正文内容]
 
 **来源**：{raw_path}
@@ -411,25 +422,36 @@ tags: {note.get('tags', '')}
                 continue
             
             title = title_match.group(1).strip()
-            
+
+            # 提取类型（LLM 声明，六选一）
+            type_match = re.search(r"\*\*类型\*\*[：:]\s*(.+)$", block, re.MULTILINE)
+            note_type = ""
+            if type_match:
+                raw_type = type_match.group(1).strip()
+                valid_types = {"概念", "方法", "观点", "案例", "人物", "公司"}
+                note_type = raw_type if raw_type in valid_types else ""
+
             # 提取标签
             tags_match = re.search(r"\*\*标签\*\*[：:]\s*(.+)$", block, re.MULTILINE)
             tags = tags_match.group(1).strip() if tags_match else ""
-            
+
             # 提取相关条目
             related_match = re.search(r"\*\*相关条目\*\*[：:]\s*(.+)$", block, re.MULTILINE)
             related = related_match.group(1).strip() if related_match else ""
-            
-            # 提取正文
+
+            # 提取正文（去掉标题行和元信息行）
             content = re.sub(r"^#\s+.+$", "", block, count=1, flags=re.MULTILINE)
+            content = re.sub(r"\*\*类型\*\*[：:].*$", "", content, flags=re.MULTILINE)
             content = re.sub(r"\n---\n.*$", "", content, flags=re.DOTALL)
             content = content.strip()
-            
+
+
             notes.append({
                 "title": title,
                 "content": content,
                 "tags": tags,
-                "related": related
+                "related": related,
+                "type": note_type,  # LLM 声明的类型，空字符串表示未声明
             })
         
         return notes
@@ -536,9 +558,107 @@ tags: {note.get('tags', '')}
         return len(wiki_files)
     
     # ========================================================================
+    # 问答知识回写
+    # ========================================================================
+
+    async def writeback_from_qa(self, question: str, answer: str, source_paths: list) -> list:
+        """
+        从问答中提取新知识，异步写回 wiki 目录。
+        只追加，不覆盖；LLM 认为没有新知识时直接跳过。
+
+        Args:
+            question: 用户问题
+            answer: 生成的回答
+            source_paths: 本次查询命中的 wiki 文件路径列表
+
+        Returns:
+            list[str]: 写入或追加的文件路径
+        """
+        if not self.vault_path:
+            return []
+
+        existing_titles = [Path(p).stem for p in source_paths]
+        prompt = (
+            f"以下是一段知识库问答记录。请判断问答中是否包含值得沉淀的新知识：\n\n"
+            f"1. 新概念：问答中出现但知识库里没有的知识点\n"
+            f"2. 关联补充：揭示了两个已有概念之间的新关系\n"
+            f"3. 用户观点：用户提问时带出的个人理解或经验\n\n"
+            f"用户问题：{question}\n\n"
+            f"回答：{answer}\n\n"
+            f"现有笔记标题（参考，避免重复）：{', '.join(existing_titles) or '（无）'}\n\n"
+            f"如果有新知识，按以下格式输出（每条一个块）：\n"
+            f"---\n"
+            f"标题: [笔记标题]\n"
+            f"类型: 概念/方法/观点/案例/人物/公司（六选一）\n"
+            f"内容: [笔记正文]\n"
+            f"---\n\n"
+            f"如果没有新知识，只输出：无"
+        )
+
+        try:
+            result = (await llm_client.generate_chat_response(prompt)).strip()
+            if result == "无":
+                return []
+
+            created_paths = []
+            date_str = datetime.now().strftime("%Y-%m-%d")
+            valid_types = {"概念", "方法", "观点", "案例", "人物", "公司"}
+
+            blocks = [b.strip() for b in result.split("---") if b.strip()]
+            for block in blocks:
+                lines = {}
+                for line in block.splitlines():
+                    if ":" in line:
+                        k, _, v = line.partition(":")
+                        lines[k.strip()] = v.strip()
+
+                title = lines.get("标题", "")
+                raw_type = lines.get("类型", "概念")
+                note_type = raw_type if raw_type in valid_types else "概念"
+                content = lines.get("内容", "")
+
+                if not title or not content:
+                    continue
+
+                wiki_subdir = self.wiki_dir / note_type
+                wiki_subdir.mkdir(parents=True, exist_ok=True)
+
+                safe_title = self._sanitize_filename(title)
+                filepath = wiki_subdir / f"{safe_title}.md"
+
+                if filepath.exists():
+                    with filepath.open("a", encoding="utf-8") as f:
+                        f.write(
+                            f"\n\n## 补充 ({date_str})\n\n"
+                            f"来源：wiki_query 问答\n"
+                            f"问题：{question}\n\n"
+                            f"{content}\n"
+                        )
+                else:
+                    filepath.write_text(
+                        f"---\ntitle: {title}\ncreated: {datetime.now().isoformat()}\n"
+                        f"source: wiki_query\ntags:\n---\n\n"
+                        f"{content}\n\n"
+                        f"---\n**来源**：问答补充\n**问题**：{question}\n",
+                        encoding="utf-8",
+                    )
+
+                created_paths.append(str(filepath))
+                logger.info(f"[Unified] Writeback: {filepath}")
+
+            if created_paths:
+                self.update_index()
+
+            return created_paths
+
+        except Exception as e:
+            logger.error(f"[Unified] writeback_from_qa failed: {e}")
+            return []
+
+    # ========================================================================
     # 工具方法
     # ========================================================================
-    
+
     def _sanitize_filename(self, title: str) -> str:
         """去除文件名非法字符"""
         safe = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "", title)
